@@ -1,0 +1,1301 @@
+/*
+ * Workbench control room: a self-contained dark instrument surface the layout
+ * hands the center column. It deliberately does not inherit the host page's
+ * light/dark mode — the values below are local, and the conversation pane it
+ * replaces stays untouched.
+ *
+ * Layout: the panel root fills its parent and stacks the head, the live reading
+ * strip, the scrollable Workspace-card grid, and the foot. The `::before` layer
+ * is the engineering grid behind that content.
+ */
+
+/* ---- panel root (the center column's occupant) ---- */
+
+/*
+ * The workbench is a global main panel, not an overlay: it fills the center
+ * column the layout hands it and keeps its own dark instrument surface so it
+ * reads as one control room regardless of the host's light/dark mode. The
+ * `::before` layer is the faint engineering grid, masked away from the edges.
+ */
+.workbench {
+  --wb-bg: #0a0d14;
+  --wb-panel: rgba(19, 23, 33, 0.86);
+  --wb-panel-solid: #141822;
+  --wb-line: rgba(255, 255, 255, 0.08);
+  --wb-line-strong: rgba(255, 255, 255, 0.14);
+  --wb-text: rgb(232, 236, 245);
+  --wb-text-dim: rgba(232, 236, 245, 0.6);
+  --wb-text-faint: rgba(232, 236, 245, 0.38);
+  --wb-accent: rgb(103, 158, 254);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
+    var(--wb-panel-solid);
+  color-scheme: dark;
+}
+
+.workbench::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+  mask-image: radial-gradient(120% 80% at 50% -10%, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(120% 80% at 50% -10%, #000 20%, transparent 78%);
+}
+
+/* A capability this composition does not mount: stated, never silent. */
+.notice {
+  position: relative;
+  margin: 0;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--wb-line);
+  background: rgba(247, 173, 49, 0.1);
+  color: rgb(247, 196, 120);
+  font-size: 12px;
+}
+
+/* A failed add: red, one line, dismissible. Silence here is the bug it fixes. */
+.noticeError {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px 10px 20px;
+  border-bottom: 1px solid rgba(244, 114, 182, 0.3);
+  background: rgba(244, 114, 182, 0.12);
+  color: rgb(247, 175, 211);
+  font-size: 12px;
+}
+
+.noticeErrorText {
+  flex: 1;
+  min-width: 0;
+}
+
+.noticeClose {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(247, 175, 211, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.noticeClose:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---- head ---- */
+
+.panelHead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--wb-line);
+}
+
+.headIdentity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.headGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 12px;
+  background: linear-gradient(150deg, rgba(103, 158, 254, 0.28), rgba(103, 158, 254, 0.04));
+  color: rgb(183, 200, 254);
+  box-shadow: 0 0 24px rgba(86, 134, 254, 0.24);
+}
+
+.headText {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--wb-text);
+}
+
+.subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--wb-text-faint);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 1px solid rgba(78, 209, 126, 0.28);
+  border-radius: 999px;
+  background: rgba(78, 209, 126, 0.08);
+  color: rgb(160, 231, 186);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(78, 209, 126);
+  box-shadow: 0 0 10px rgba(78, 209, 126, 0.9);
+  animation: wbPulse 2s ease-in-out infinite;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.16s var(--ds-ease-in-out), border-color 0.16s var(--ds-ease-in-out);
+}
+
+.action:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 2px;
+}
+
+.iconOnly {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--wb-text-dim);
+  cursor: pointer;
+  transition: background 0.16s var(--ds-ease-in-out), color 0.16s var(--ds-ease-in-out);
+}
+
+.iconOnly:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--wb-text);
+}
+
+/* ---- live readings ---- */
+
+.readings {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wb-line);
+}
+
+.reading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--wb-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+}
+
+.readingLabel {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wb-text-faint);
+}
+
+.readingValue {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--wb-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.readingHint {
+  font-size: 11px;
+  color: var(--wb-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- project grid ---- */
+
+.projects {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 18px 20px 22px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.projects::-webkit-scrollbar {
+  width: 10px;
+}
+
+.projects::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.card {
+  --card-accent: rgb(103, 158, 254);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--wb-line);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.012);
+  overflow: hidden;
+  transition: transform 0.18s var(--ds-ease-in-out), border-color 0.18s var(--ds-ease-in-out),
+    box-shadow 0.18s var(--ds-ease-in-out);
+}
+
+/* Accent rail: the card's identity stripe, colored by its accent key. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--card-accent), transparent 85%);
+  opacity: 0.9;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--wb-line-strong);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+}
+
+/*
+ * Files mode is a browser, not a badge: the card claims real height so the
+ * explorer has rows to show, and the grid row grows with it.
+ */
+.cardFiles {
+  min-height: 380px;
+}
+
+/* Card head: the identity button, the face switch, and the remove action. */
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/*
+ * The card's identity IS its open gesture: picking the folder name connects the
+ * workspace and shows its conversation, like a row in the official browser. The
+ * button is reset so it looks exactly like the label it wraps.
+ */
+.cardOpen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 4px 2px 2px;
+  margin: -2px -4px -2px -2px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s var(--ds-ease-in-out);
+}
+
+.cardOpen:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cardOpen:disabled {
+  cursor: default;
+}
+
+.cardOpen:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 1px;
+}
+
+.cardGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--wb-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card-accent) 16%, transparent);
+  color: var(--card-accent);
+}
+
+.cardTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wb-text);
+}
+
+.faceSwitch {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  border: 1px solid var(--wb-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.faceChip {
+  padding: 2px 9px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wb-text-dim);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.14s var(--ds-ease-in-out), color 0.14s var(--ds-ease-in-out);
+}
+
+.faceChip:hover {
+  color: var(--wb-text);
+}
+
+.faceChipActive {
+  background: color-mix(in srgb, var(--card-accent) 22%, transparent);
+  color: var(--wb-text);
+}
+
+/* The Workspace directory path: read-only, one line, monospaced. */
+.cardPath {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ds-font-family-code);
+  font-size: 11.5px;
+  letter-spacing: -0.01em;
+  color: rgba(183, 200, 254, 0.82);
+}
+
+/* Conversation face: the Session count and the open/start action. */
+.conversationFace {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 74px;
+  padding: 10px 12px;
+  border: 1px solid var(--wb-line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.metaRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metaCount {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--wb-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.metaLabel {
+  font-size: 11px;
+  color: var(--wb-text-faint);
+}
+
+.cardActions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+/* ---- the file explorer (a VS Code-shaped tree inside a card) ---- */
+
+/*
+ * The explorer owns the card's leftover height in Files mode: a fixed section
+ * header, a scrolling row list, and a one-line hint. Rows are 22px with 13px
+ * text — the editor's own rhythm — and every indent level contributes one
+ * guide column, so nesting reads as a rule rather than as padding.
+ */
+.explorer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--wb-line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.explorerHead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  height: 26px;
+  padding: 0 6px 0 4px;
+  border-bottom: 1px solid var(--wb-line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.explorerCaret {
+  flex: none;
+  color: var(--wb-text-faint);
+}
+
+.explorerTitle {
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--wb-text-dim);
+}
+
+.explorerParent {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--wb-text-faint);
+}
+
+.explorerTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.explorerTool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wb-text-dim);
+  cursor: pointer;
+  transition: background 0.14s var(--ds-ease-in-out), color 0.14s var(--ds-ease-in-out);
+}
+
+.explorerTool:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--wb-text);
+}
+
+.explorerTool:disabled {
+  color: var(--wb-text-faint);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.explorerTool:focus-visible,
+.explorerRow:focus-visible,
+.explorerRetry:focus-visible {
+  outline: 1px solid var(--wb-accent);
+  outline-offset: -1px;
+}
+
+.explorerRows {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.explorerRows::-webkit-scrollbar {
+  width: 10px;
+}
+
+.explorerRows::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.explorerItem {
+  min-width: 0;
+}
+
+.explorerRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 22px;
+  padding: 0 6px 0 4px;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 22px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* VS Code's hover band, then its focus band: hover is lighter than selection. */
+.explorerRow:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.explorerRowSelected {
+  background: rgba(103, 158, 254, 0.16);
+  box-shadow: inset 2px 0 0 var(--wb-accent);
+}
+
+.explorerRowSelected:hover {
+  background: rgba(103, 158, 254, 0.22);
+}
+
+/* One indent guide per ancestor level, drawn on the row's own backdrop. */
+.explorerGuide {
+  flex: none;
+  width: 14px;
+  align-self: stretch;
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.11) 0 1px, transparent 1px);
+  background-repeat: no-repeat;
+}
+
+.explorerGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 14px;
+  color: var(--wb-text-faint);
+}
+
+.explorerRow:hover .explorerGlyph {
+  color: var(--wb-text-dim);
+}
+
+.explorerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  color: rgb(140, 168, 214);
+}
+
+.explorerRow[data-explorer-kind='file'] .explorerIcon {
+  color: inherit;
+}
+
+.explorerName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.explorerSize {
+  flex: none;
+  padding-left: 8px;
+  font-size: 10.5px;
+  color: var(--wb-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A note row stands in for a level with nothing to show. */
+.explorerNoteRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px 0 4px;
+  box-sizing: border-box;
+  font-size: 11.5px;
+  color: var(--wb-text-faint);
+}
+
+.explorerNoteText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explorerErrorText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgb(244, 154, 194);
+}
+
+.explorerRetry {
+  flex: none;
+  padding: 0 8px;
+  height: 18px;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.explorerRetry:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.explorerSpin {
+  animation: wbSpin 1s linear infinite;
+}
+
+/* Stated, never silent: the face says why it has no rows. */
+.explorerNote {
+  margin: 0;
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--wb-text-dim);
+}
+
+.explorerFoot {
+  flex: none;
+  margin: 0;
+  padding: 5px 8px;
+  border-top: 1px solid var(--wb-line);
+  font-size: 10.5px;
+  color: var(--wb-text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- the in-app directory picker ----
+ *
+ * The picker is a body-portaled Modal, so the panel's token block does not
+ * cascade into it: this class restates the same values on the dialog element.
+ * Everything inside is styled from them, which keeps the dialog looking like
+ * part of the control room instead of like the host page's theme.
+ */
+
+.picker {
+  --wb-line: rgba(255, 255, 255, 0.08);
+  --wb-line-strong: rgba(255, 255, 255, 0.14);
+  --wb-text: rgb(232, 236, 245);
+  --wb-text-dim: rgba(232, 236, 245, 0.6);
+  --wb-text-faint: rgba(232, 236, 245, 0.38);
+  --wb-accent: rgb(103, 158, 254);
+  width: min(560px, 92vw);
+  color: var(--wb-text);
+  color-scheme: dark;
+}
+
+.pickerContent {
+  max-height: min(560px, 72vh);
+}
+
+.pickerCrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0 0 8px;
+  font-size: 12px;
+}
+
+.pickerCrumbCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pickerCrumbSep {
+  color: var(--wb-text-faint);
+}
+
+.pickerCrumb {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pickerCrumb:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--wb-text);
+}
+
+.pickerCrumbCurrent {
+  color: var(--wb-text);
+  font-weight: 600;
+}
+
+/* The address bar: an editable path, Go, and one-level-up. */
+.pickerAddress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 8px;
+}
+
+.pickerAddressInput {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+}
+
+.pickerBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--wb-line);
+}
+
+.pickerPath {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ds-font-family-code);
+  font-size: 11.5px;
+  color: rgba(183, 200, 254, 0.82);
+}
+
+.pickerToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font-size: 11px;
+  color: var(--wb-text-dim);
+  cursor: pointer;
+}
+
+.pickerTool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-text-dim);
+  cursor: pointer;
+}
+
+.pickerTool:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--wb-text);
+}
+
+.pickerTool:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pickerCreate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.pickerNotice {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  border: 1px solid rgba(244, 114, 182, 0.3);
+  border-radius: 8px;
+  background: rgba(244, 114, 182, 0.12);
+  color: rgb(247, 175, 211);
+  font-size: 11.5px;
+}
+
+.pickerRows {
+  min-height: 180px;
+  max-height: 300px;
+  overflow: auto;
+  padding: 4px 0;
+  border: 1px solid var(--wb-line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.24);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.pickerRows::-webkit-scrollbar {
+  width: 10px;
+}
+
+.pickerRows::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.pickerRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 26px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pickerRow:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.pickerNote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  color: var(--wb-text-faint);
+}
+
+/* ---- the workbench file editor (a right-column page tab) ----
+ *
+ * The editor lives in the host's right column, so it borrows the host page's
+ * own chrome: no local token block, no forced dark surface. Only the row
+ * rhythm, the gutter, and the editable body are this plugin's business, and
+ * everything inherits the surrounding theme.
+ */
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: 12.5px;
+}
+
+.editorHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.24));
+}
+
+.editorName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.editorDirty {
+  flex: none;
+  color: var(--dsw-alias-text-warning, #d98c1f);
+  font-size: 10px;
+}
+
+.editorTools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.editorMeta {
+  font-size: 10.5px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.editorNotice {
+  flex: none;
+  margin: 0;
+  padding: 6px 10px;
+  background: rgba(217, 140, 31, 0.14);
+  color: var(--dsw-alias-text-warning, #a8640f);
+  font-size: 11.5px;
+}
+
+.editorNote {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 10px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.editorFailed {
+  margin: 0;
+  color: var(--dsw-alias-text-danger, #d9483b);
+}
+
+/* The body scrolls as one surface: gutter and text share the same scroll box,
+   so line numbers stay on their lines at every offset. */
+.editorBody {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-family: var(--ds-font-family-code);
+}
+
+.editorGutter {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  padding: 8px 8px 8px 10px;
+  text-align: right;
+  font-size: 11.5px;
+  line-height: 1.5;
+  opacity: 0.4;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.editorLineNo {
+  display: block;
+}
+
+.editorText,
+.editorInput {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px 8px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.editorText {
+  overflow: visible;
+}
+
+.editorInput {
+  resize: none;
+  overflow: hidden;
+  white-space: pre;
+}
+
+.editorFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 6px 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.24));
+}
+
+.editorHint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  opacity: 0.6;
+}
+
+.editorChip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.cardUpdated {
+  font-size: 11px;
+  color: var(--wb-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The empty card slot: one more route into the workspace add flow. */
+.addCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 190px;
+  padding: 18px;
+  border: 1px dashed var(--wb-line-strong);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.012);
+  color: var(--wb-text-dim);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.18s var(--ds-ease-in-out), background 0.18s var(--ds-ease-in-out),
+    transform 0.18s var(--ds-ease-in-out);
+}
+
+.addCard:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, rgb(103, 158, 254) 60%, transparent);
+  background: rgba(103, 158, 254, 0.06);
+}
+
+.addCard:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.addGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 14px;
+  background: linear-gradient(150deg, rgba(103, 158, 254, 0.22), transparent);
+  color: rgb(183, 200, 254);
+}
+
+.addTitle {
+  font-size: 13px;
+  color: var(--wb-text);
+}
+
+.addHint {
+  font-size: 11.5px;
+  color: var(--wb-text-faint);
+}
+
+
+/* ---- accent palette ---- */
+
+.accent_azure { --card-accent: rgb(103, 158, 254); }
+.accent_violet { --card-accent: rgb(167, 139, 250); }
+.accent_amber { --card-accent: rgb(247, 173, 49); }
+.accent_emerald { --card-accent: rgb(78, 209, 126); }
+.accent_rose { --card-accent: rgb(244, 114, 182); }
+.accent_slate { --card-accent: rgb(151, 157, 166); }
+
+/* ---- empty state ---- */
+
+.empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 56px 24px;
+  border: 1px dashed var(--wb-line-strong);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.014);
+  text-align: center;
+}
+
+.emptyGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 14px;
+  background: linear-gradient(150deg, rgba(103, 158, 254, 0.22), transparent);
+  color: rgb(183, 200, 254);
+}
+
+.emptyTitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--wb-text);
+}
+
+.emptyHint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--wb-text-faint);
+}
+
+/* ---- foot ---- */
+
+.panelFoot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-top: 1px solid var(--wb-line);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.footHint {
+  font-size: 11px;
+  color: var(--wb-text-faint);
+}
+
+/* ---- narrow windows and motion preferences ---- */
+
+@media (max-width: 760px) {
+  .readings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live {
+    display: none;
+  }
+}
+
+@keyframes wbPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes wbSpin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveDot,
+  .explorerSpin {
+    animation: none;
+  }
+
+  .card,
+  .addCard {
+    transition: none;
+  }
+}

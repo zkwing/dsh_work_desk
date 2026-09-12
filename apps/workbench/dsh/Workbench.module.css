@@ -1,0 +1,729 @@
+/*
+ * Workbench control room: a self-contained dark instrument surface that reads
+ * as one panel laid over whatever surface opened it. It deliberately does not
+ * inherit the host page's light/dark mode — the values below are local, and the
+ * page underneath stays untouched.
+ *
+ * Layout: a sidebar-foot trigger sized by the shell's `wide` flag, and a
+ * portal-rendered overlay holding the head, the live reading strip, and the
+ * project grid. The overlay is the positioning context for the backdrop.
+ */
+
+/* ── trigger (sidebar.footer.action occupant) ─────────────────────────────── */
+
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.16s var(--ds-ease-in-out), color 0.16s var(--ds-ease-in-out),
+    border-color 0.16s var(--ds-ease-in-out), transform 0.16s var(--ds-ease-in-out);
+}
+
+.trigger:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l3);
+}
+
+.trigger:active {
+  transform: translateY(1px);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 2px;
+}
+
+.triggerWide {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 0 8px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.triggerGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.triggerLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.triggerCount {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: rgba(103, 158, 254, 0.16);
+  color: rgb(183, 200, 254);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── overlay ─────────────────────────────────────────────────────────────── */
+
+.overlay {
+  --wb-bg: #0a0d14;
+  --wb-panel: rgba(19, 23, 33, 0.86);
+  --wb-panel-solid: #141822;
+  --wb-line: rgba(255, 255, 255, 0.08);
+  --wb-line-strong: rgba(255, 255, 255, 0.14);
+  --wb-text: rgb(232, 236, 245);
+  --wb-text-dim: rgba(232, 236, 245, 0.6);
+  --wb-text-faint: rgba(232, 236, 245, 0.38);
+  --wb-accent: rgb(103, 158, 254);
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  box-sizing: border-box;
+  color-scheme: dark;
+  animation: wbFade 0.18s var(--ds-ease-in-out);
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  background:
+    radial-gradient(120% 90% at 12% -10%, rgba(86, 134, 254, 0.22), transparent 60%),
+    radial-gradient(90% 80% at 100% 110%, rgba(147, 51, 234, 0.18), transparent 62%),
+    rgba(4, 6, 10, 0.62);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  cursor: pointer;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(1180px, 100%);
+  max-height: min(860px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 22%),
+    var(--wb-panel-solid);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 40px 120px rgba(0, 0, 0, 0.62),
+    0 6px 24px rgba(0, 0, 0, 0.4);
+  animation: wbRise 0.26s var(--ds-ease-in-out);
+}
+
+/* Faint engineering grid behind the content, clipped by the panel radius. */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 32px 32px, 32px 32px;
+  mask-image: radial-gradient(120% 80% at 50% -10%, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(120% 80% at 50% -10%, #000 20%, transparent 78%);
+}
+
+/* ── head ────────────────────────────────────────────────────────────────── */
+
+.head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--wb-line);
+}
+
+.headIdentity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.headGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 12px;
+  background: linear-gradient(150deg, rgba(103, 158, 254, 0.28), rgba(103, 158, 254, 0.04));
+  color: rgb(183, 200, 254);
+  box-shadow: 0 0 24px rgba(86, 134, 254, 0.24);
+}
+
+.headText {
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--wb-text);
+}
+
+.subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: var(--wb-text-faint);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  border: 1px solid rgba(78, 209, 126, 0.28);
+  border-radius: 999px;
+  background: rgba(78, 209, 126, 0.08);
+  color: rgb(160, 231, 186);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.liveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(78, 209, 126);
+  box-shadow: 0 0 10px rgba(78, 209, 126, 0.9);
+  animation: wbPulse 2s ease-in-out infinite;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.16s var(--ds-ease-in-out), border-color 0.16s var(--ds-ease-in-out);
+}
+
+.action:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 2px;
+}
+
+.iconOnly {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--wb-text-dim);
+  cursor: pointer;
+  transition: background 0.16s var(--ds-ease-in-out), color 0.16s var(--ds-ease-in-out);
+}
+
+.iconOnly:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--wb-text);
+}
+
+/* ── live readings ───────────────────────────────────────────────────────── */
+
+.readings {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--wb-line);
+}
+
+.reading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--wb-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+}
+
+.readingLabel {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--wb-text-faint);
+}
+
+.readingValue {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--wb-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.readingHint {
+  font-size: 11px;
+  color: var(--wb-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── project grid ────────────────────────────────────────────────────────── */
+
+.projects {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  padding: 18px 20px 22px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.projects::-webkit-scrollbar {
+  width: 10px;
+}
+
+.projects::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.card {
+  --card-accent: rgb(103, 158, 254);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--wb-line);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.012);
+  overflow: hidden;
+  transition: transform 0.18s var(--ds-ease-in-out), border-color 0.18s var(--ds-ease-in-out),
+    box-shadow 0.18s var(--ds-ease-in-out);
+}
+
+/* Accent rail: the card's identity stripe, colored by its accent key. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--card-accent), transparent 85%);
+  opacity: 0.9;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--wb-line-strong);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+}
+
+.card[data-status='archived'] {
+  opacity: 0.62;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cardGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid var(--wb-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--card-accent);
+}
+
+.nameInput {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wb-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.nameInput:hover,
+.pathInput:hover,
+.noteInput:hover,
+.nextInput:hover,
+.numberInput:hover {
+  border-color: var(--wb-line);
+}
+
+.nameInput:focus,
+.pathInput:focus,
+.noteInput:focus,
+.nextInput:focus,
+.numberInput:focus {
+  outline: none;
+  border-color: rgba(103, 158, 254, 0.6);
+  background: rgba(103, 158, 254, 0.08);
+}
+
+.nameInput::placeholder,
+.pathInput::placeholder,
+.noteInput::placeholder,
+.nextInput::placeholder {
+  color: var(--wb-text-faint);
+  font-weight: 400;
+}
+
+.pathInput,
+.noteInput,
+.nextInput,
+.numberInput {
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wb-text-dim);
+  font: inherit;
+  font-size: 12px;
+}
+
+.pathInput {
+  font-family: var(--ds-font-family-code);
+  letter-spacing: -0.01em;
+  color: rgba(183, 200, 254, 0.82);
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progressTrack {
+  flex: 1;
+  min-width: 40px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--card-accent), rgba(255, 255, 255, 0.55));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--card-accent) 70%, transparent);
+  transition: width 0.28s var(--ds-ease-in-out);
+}
+
+.numberInput {
+  width: 46px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--wb-text);
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.numberInput::-webkit-outer-spin-button,
+.numberInput::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.slash {
+  color: var(--wb-text-faint);
+  font-size: 12px;
+}
+
+.percent {
+  min-width: 38px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--wb-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.nextRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px dashed var(--wb-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.nextLabel {
+  flex: none;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wb-text-faint);
+}
+
+.nextInput {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.statusGroup {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.statusChip {
+  padding: 3px 9px;
+  border: 1px solid var(--wb-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--wb-text-dim);
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.14s var(--ds-ease-in-out), color 0.14s var(--ds-ease-in-out),
+    border-color 0.14s var(--ds-ease-in-out);
+}
+
+.statusChip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--wb-text);
+}
+
+.statusChipActive {
+  border-color: color-mix(in srgb, var(--card-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--card-accent) 20%, transparent);
+  color: var(--wb-text);
+}
+
+.accentGroup {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+
+.accentDot {
+  --card-accent: rgb(103, 158, 254);
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--card-accent);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.14s var(--ds-ease-in-out), transform 0.14s var(--ds-ease-in-out);
+}
+
+.accentDot:hover {
+  opacity: 0.85;
+  transform: scale(1.12);
+}
+
+.accentDotActive {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── accent palette ──────────────────────────────────────────────────────── */
+
+.accent_azure { --card-accent: rgb(103, 158, 254); }
+.accent_violet { --card-accent: rgb(167, 139, 250); }
+.accent_amber { --card-accent: rgb(247, 173, 49); }
+.accent_emerald { --card-accent: rgb(78, 209, 126); }
+.accent_rose { --card-accent: rgb(244, 114, 182); }
+.accent_slate { --card-accent: rgb(151, 157, 166); }
+
+/* ── empty state ─────────────────────────────────────────────────────────── */
+
+.empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 56px 24px;
+  border: 1px dashed var(--wb-line-strong);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.014);
+  text-align: center;
+}
+
+.emptyGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--wb-line-strong);
+  border-radius: 14px;
+  background: linear-gradient(150deg, rgba(103, 158, 254, 0.22), transparent);
+  color: rgb(183, 200, 254);
+}
+
+.emptyTitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--wb-text);
+}
+
+.emptyHint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--wb-text-faint);
+}
+
+/* ── foot ────────────────────────────────────────────────────────────────── */
+
+.foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  border-top: 1px solid var(--wb-line);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.footHint {
+  font-size: 11px;
+  color: var(--wb-text-faint);
+}
+
+/* ── narrow windows and motion preferences ───────────────────────────────── */
+
+@media (max-width: 760px) {
+  .overlay {
+    padding: 12px;
+  }
+
+  .readings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live {
+    display: none;
+  }
+}
+
+@keyframes wbFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes wbRise {
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes wbPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .panel,
+  .liveDot {
+    animation: none;
+  }
+
+  .card,
+  .progressFill,
+  .trigger {
+    transition: none;
+  }
+}

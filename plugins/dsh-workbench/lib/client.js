@@ -1,0 +1,2610 @@
+window.__ModuleLoader__.load({
+	id: "dsh-workbench",
+	factory: (require) => {
+		var module = { exports: {} };
+		var exports = module.exports;
+		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
+		let react_jsx_runtime = require("react/jsx-runtime");
+		let react = require("react");
+		let _deepseek_ai_dsh_client_ui_primitives = require("@deepseek-ai/dsh-client-ui-primitives");
+		//#region dsh-workbench/lib/types/client/workspaces.js
+		/** Accent keys, cycled by a Workspace's stable position in the Host order. */
+		const CARD_ACCENTS = [
+			"azure",
+			"violet",
+			"amber",
+			"emerald",
+			"rose",
+			"slate"
+		];
+		/**
+		* Pick a card accent from the Workspace's index in the Host order. Position
+		* rather than identity: the same Workspace keeps its colour while the order is
+		* stable, and the palette never repeats two adjacent cards.
+		* @param index - zero-based position in the Workspace order.
+		* @returns the accent key for that card.
+		*/
+		function accentFor(index) {
+			return CARD_ACCENTS[index % CARD_ACCENTS.length] ?? "azure";
+		}
+		/** Nothing mounted yet: the panel's state before the late services arrive. */
+		const NO_CAPABILITIES = {
+			navigation: false,
+			workspaces: false,
+			files: false,
+			picker: false,
+			pane: false
+		};
+		/**
+		* Create the panel's capability source. It is a plain observable rather than a
+		* React state so the registrant can hand it to the slot as a `hooks` source:
+		* the framework binds it to a `useCapability` selector hook, and a flag that
+		* flips later re-renders the panel without re-registering anything.
+		* @returns the source and its writer.
+		*/
+		function createCapabilityStore() {
+			let snapshot = NO_CAPABILITIES;
+			const listeners = /* @__PURE__ */ new Set();
+			return {
+				getSnapshot: () => snapshot,
+				subscribe(listener) {
+					listeners.add(listener);
+					return () => {
+						listeners.delete(listener);
+					};
+				},
+				set(patch) {
+					const next = {
+						...snapshot,
+						...patch
+					};
+					if (!Object.keys(next).some((key) => next[key] !== snapshot[key])) return;
+					snapshot = next;
+					for (const listener of [...listeners]) listener();
+				}
+			};
+		}
+		/** Deepest nesting {@link explorerRows} walks, so a symlink loop cannot outrun it. */
+		const MAX_EXPLORER_DEPTH = 32;
+		/** Natural, case-insensitive name order, so `file2` precedes `file10`. */
+		const byName = new Intl.Collator(void 0, {
+			numeric: true,
+			sensitivity: "base"
+		});
+		/**
+		* Order one level for display: directories first, then everything else, each
+		* group by name. The endpoint's order is a listing fact; this is the reader's.
+		* @param entries - the listing as the endpoint returned it.
+		* @returns a new array, directories first, then by name within each group.
+		*/
+		function orderEntries(entries) {
+			return [...entries].sort((left, right) => {
+				const group = Number(right.type === "directory") - Number(left.type === "directory");
+				return group !== 0 ? group : byName.compare(left.name, right.name);
+			});
+		}
+		/**
+		* Split a path into the directory part (trailing separator kept) and the last
+		* segment, for the explorer's header row. Accepts either separator, because the
+		* path comes from the Host and may be a Windows one.
+		* @param path - the workspace root.
+		* @returns the directory prefix and the name.
+		*/
+		function splitPath(path) {
+			const trimmed = path.replace(/[/\\]+$/, "");
+			const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+			if (cut < 0) return {
+				directory: "",
+				name: trimmed
+			};
+			return {
+				directory: trimmed.slice(0, cut + 1),
+				name: trimmed.slice(cut + 1)
+			};
+		}
+		/**
+		* Flatten the listed tree into the rows the explorer draws, in display order:
+		* each expanded directory contributes its ordered entries and then, right after
+		* a directory row, that directory's own subtree.
+		*
+		* Only levels already in `levels` are walked, so a listing happens when a
+		* directory is first expanded and never for the whole tree at once.
+		* @param root - the workspace root being browsed.
+		* @param levels - every listed level, keyed by absolute path.
+		* @param expanded - the directories the reader has opened.
+		* @returns the flat row list, top to bottom.
+		*/
+		function explorerRows(root, levels, expanded) {
+			const rows = [];
+			const walk = (path, depth) => {
+				if (depth > 32) return;
+				const level = levels.get(path);
+				if (level === void 0 || level.status === "loading") {
+					rows.push({
+						kind: "note",
+						path,
+						depth,
+						note: "loading"
+					});
+					return;
+				}
+				if (level.status === "error") {
+					rows.push({
+						kind: "note",
+						path,
+						depth,
+						note: "failed",
+						error: level.error
+					});
+					return;
+				}
+				if (level.entries.length === 0) {
+					rows.push({
+						kind: "note",
+						path,
+						depth,
+						note: "empty"
+					});
+					return;
+				}
+				for (const entry of orderEntries(level.entries)) {
+					const child = childPath(path, entry.name);
+					const open = entry.type === "directory" && expanded.has(child);
+					rows.push({
+						kind: "entry",
+						path: child,
+						name: entry.name,
+						type: entry.type,
+						depth,
+						size: entry.size,
+						expanded: open
+					});
+					if (open) walk(child, depth + 1);
+				}
+				if (level.truncated) rows.push({
+					kind: "note",
+					path,
+					depth,
+					note: "truncated"
+				});
+			};
+			walk(root, 0);
+			return rows;
+		}
+		/**
+		* Join a parent path with a child name using `/`, whatever separators the parent
+		* carries. The Host resolves mixed separators, and the tree only needs a stable
+		* key, so no platform branch is needed here.
+		* @param parent - the listed directory's path.
+		* @param name - the child's basename.
+		* @returns the child's path.
+		*/
+		function childPath(parent, name) {
+			if (parent === "") return name;
+			return `${parent.replace(/[/\\]+$/, "")}/${name}`;
+		}
+		/** Compact byte size for a tree row. */
+		function sizeText(bytes) {
+			if (bytes === void 0) return "";
+			if (bytes < 1024) return `${bytes} B`;
+			if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+			return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+		}
+		/**
+		* Turn a Remote failure into one line for the tree. The Remote answers with a
+		* structured failure rather than throwing, so the caller only formats it.
+		*
+		* The three Workspace-file codes this plugin can provoke have copy of their own
+		* in the `workbench` namespace; anything else is a Host diagnostic, and Host
+		* text is not this plugin's copy to translate.
+		* @param t - the bound `workbench` translate.
+		* @param error - the failure's code and message.
+		* @returns the display line.
+		*/
+		function failureText(t, error) {
+			switch (error.code) {
+				case "workspace-file/outside-workspace": return t("tree.error.outside");
+				case "workspace-file/not-found": return t("tree.error.notFound");
+				case "workspace-file/not-directory": return t("tree.error.notDirectory");
+				default: return error.message;
+			}
+		}
+		/**
+		* Classify one pick answer into the flow's next move.
+		*
+		* This is not "call `pickDirectory()` and use the path". A boot composes exactly
+		* one directory-picking interaction, and the Host **refuses** a verb that
+		* interaction cannot serve. With the browse backend — the resolved choice on a
+		* host whose native chooser cannot reach the operator — `pick` answers
+		* `directory-picker/unavailable`, and the browse primitives are the only way
+		* through. That refusal is a fork in the flow, not an error to show.
+		* @param reply - the pick answer, or its absence when the namespace is unmounted.
+		* @returns the next step of the add flow.
+		*/
+		function pickStep(reply) {
+			if (reply === void 0) return { step: "browse" };
+			if (reply.ok) return reply.value === null || reply.value === "" ? { step: "cancelled" } : {
+				step: "picked",
+				path: reply.value
+			};
+			if (reply.error.code === "directory-picker/unavailable") return { step: "browse" };
+			return {
+				step: "failed",
+				message: reply.error.message
+			};
+		}
+		/**
+		* The breadcrumb chain for one listing: the Host's own chain, with Home marked
+		* where it appears, and prepended as a jump target when the listed directory is
+		* not under Home at all.
+		* @param listing - the level being shown.
+		* @returns the crumbs, filesystem root first.
+		*/
+		function pickerCrumbs(listing) {
+			const chain = listing.crumbs.length > 0 ? listing.crumbs : [{
+				name: listing.path,
+				path: listing.path,
+				hidden: false
+			}];
+			const crumbs = [];
+			if (!chain.some((crumb) => crumb.path === listing.home)) crumbs.push({
+				path: listing.home,
+				name: "",
+				home: true
+			});
+			for (const crumb of chain) crumbs.push({
+				path: crumb.path,
+				name: crumb.name,
+				home: crumb.path === listing.home
+			});
+			return crumbs;
+		}
+		/**
+		* The rows one picker level shows: hidden directories filtered unless asked
+		* for, in natural case-insensitive name order.
+		* @param listing - the level being shown.
+		* @param showHidden - whether the reader asked for hidden directories.
+		* @returns the rows, in display order.
+		*/
+		function pickerEntries(listing, showHidden) {
+			return listing.entries.filter((entry) => showHidden || !entry.hidden).sort((left, right) => byName.compare(left.name, right.name));
+		}
+		/**
+		* The `dsh-resource://file/session/<sessionId>/<path>` address of one file.
+		*
+		* Built here rather than imported: the grammar lives in
+		* `@deepseek-ai/dsh-util-workspace-path`, which is not a platform-baseline
+		* module, and this plugin resolves its runtime dependencies from the module
+		* table. The grammar is fixed and small — every segment component-encoded, `:`
+		* left literal so a drive letter reads as written, backslashes normalized to
+		* `/` — and `verify-artifact.mjs` pins it against the documented examples.
+		*
+		* The **session** scope is the one that matters: the official `text` tab type
+		* claims `dsh-resource://file/session/…` addresses (and only those), because
+		* the Host resolves the path against the Session's own workspace root.
+		* @param sessionId - the Session whose Host workspace resolves the path.
+		* @param path - absolute or workspace-relative path.
+		* @returns the address to hand to `ctx.sidebarRight.openResource`.
+		*/
+		function fileAddress(sessionId, path) {
+			const encoded = path.replace(/\\/g, "/").replace(/^(?:\.\/)+/, "").split("/").map((segment) => encodeURIComponent(segment).replace(/%3A/gi, ":")).join("/");
+			return `dsh-resource://file/session/${encodeURIComponent(sessionId)}/${encoded}`;
+		}
+		/**
+		* The parent of one path, or undefined when it already is a root.
+		* @param path - an absolute path, with either separator.
+		* @returns the parent path, separator included.
+		*/
+		function parentPathOf(path) {
+			const trimmed = path.replace(/[/\\]+$/, "");
+			const cut = Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\"));
+			if (cut < 0) return void 0;
+			const parent = trimmed.slice(0, cut + 1);
+			return parent === "" ? void 0 : parent;
+		}
+		//#endregion
+		//#region \0dsh-css:D:\1_SoftWare\DeepSeek_Harness\deepseek-harness\packages\plugins\dsh-workbench\src\client\Workbench.module.css.mjs
+		const css = ".y5tTyq_workbench{--wb-bg:#0a0d14;--wb-panel:#131721db;--wb-panel-solid:#141822;--wb-line:#ffffff14;--wb-line-strong:#ffffff24;--wb-text:#e8ecf5;--wb-text-dim:#e8ecf599;--wb-text-faint:#e8ecf561;--wb-accent:#679efe;box-sizing:border-box;background:linear-gradient(180deg, #ffffff08, transparent 18%), var(--wb-panel-solid);color-scheme:dark;flex-direction:column;width:100%;height:100%;min-height:0;display:flex;position:relative;overflow:hidden}.y5tTyq_workbench:before{content:\"\";pointer-events:none;background-image:linear-gradient(#ffffff07 1px,#0000 1px),linear-gradient(90deg,#ffffff07 1px,#0000 1px);background-size:32px 32px,32px 32px;position:absolute;inset:0;-webkit-mask-image:radial-gradient(120% 80% at 50% -10%,#000 20%,#0000 78%);mask-image:radial-gradient(120% 80% at 50% -10%,#000 20%,#0000 78%)}.y5tTyq_notice{border-bottom:1px solid var(--wb-line);color:#f7c478;background:#f7ad311a;margin:0;padding:10px 20px;font-size:12px;position:relative}.y5tTyq_noticeError{color:#f7afd3;background:#f472b61f;border-bottom:1px solid #f472b64d;align-items:center;gap:10px;margin:0;padding:10px 14px 10px 20px;font-size:12px;display:flex;position:relative}.y5tTyq_noticeErrorText{flex:1;min-width:0}.y5tTyq_noticeClose{width:22px;height:22px;color:inherit;font:inherit;cursor:pointer;background:0 0;border:1px solid #f7afd359;border-radius:6px;flex:none;padding:0;font-size:11px;line-height:1}.y5tTyq_noticeClose:hover{background:#ffffff1f}.y5tTyq_panelHead{border-bottom:1px solid var(--wb-line);justify-content:space-between;align-items:center;gap:16px;padding:18px 20px;display:flex;position:relative}.y5tTyq_headIdentity{align-items:center;gap:12px;min-width:0;display:flex}.y5tTyq_headGlyph{border:1px solid var(--wb-line-strong);color:#b7c8fe;background:linear-gradient(150deg,#679efe47,#679efe0a);border-radius:12px;flex:none;justify-content:center;align-items:center;width:38px;height:38px;display:inline-flex;box-shadow:0 0 24px #5686fe3d}.y5tTyq_headText{min-width:0}.y5tTyq_title{letter-spacing:.04em;color:var(--wb-text);margin:0;font-size:17px;font-weight:600}.y5tTyq_subtitle{color:var(--wb-text-faint);margin:3px 0 0;font-size:12px}.y5tTyq_headActions{flex:none;align-items:center;gap:8px;display:flex}.y5tTyq_live{box-sizing:border-box;color:#a0e7ba;letter-spacing:.06em;text-transform:uppercase;background:#4ed17e14;border:1px solid #4ed17e47;border-radius:999px;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:11px;display:inline-flex}.y5tTyq_liveDot{background:#4ed17e;border-radius:50%;width:6px;height:6px;animation:2s ease-in-out infinite y5tTyq_wbPulse;box-shadow:0 0 10px #4ed17ee6}.y5tTyq_action{box-sizing:border-box;border:1px solid var(--wb-line-strong);height:30px;color:var(--wb-text);font:inherit;cursor:pointer;transition:background .16s var(--ds-ease-in-out), border-color .16s var(--ds-ease-in-out);background:#ffffff0a;border-radius:9px;align-items:center;gap:6px;padding:0 12px;font-size:12px;display:inline-flex}.y5tTyq_action:hover{background:#ffffff17;border-color:#ffffff38}.y5tTyq_action:focus-visible{outline:2px solid var(--wb-accent);outline-offset:2px}.y5tTyq_iconOnly{box-sizing:border-box;width:30px;height:30px;color:var(--wb-text-dim);cursor:pointer;transition:background .16s var(--ds-ease-in-out), color .16s var(--ds-ease-in-out);background:0 0;border:1px solid #0000;border-radius:9px;justify-content:center;align-items:center;padding:0;display:inline-flex}.y5tTyq_iconOnly:hover{color:var(--wb-text);background:#ffffff14}.y5tTyq_readings{border-bottom:1px solid var(--wb-line);grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:16px 20px;display:grid;position:relative}.y5tTyq_reading{border:1px solid var(--wb-line);background:linear-gradient(#ffffff0d,#ffffff04);border-radius:14px;flex-direction:column;gap:6px;padding:12px 14px;display:flex}.y5tTyq_readingLabel{letter-spacing:.08em;text-transform:uppercase;color:var(--wb-text-faint);font-size:11px}.y5tTyq_readingValue{color:var(--wb-text);font-variant-numeric:tabular-nums;font-size:24px;font-weight:600;line-height:1.1}.y5tTyq_readingHint{color:var(--wb-text-dim);font-variant-numeric:tabular-nums;font-size:11px}.y5tTyq_projects{scrollbar-width:thin;scrollbar-color:#ffffff29 transparent;flex:1;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;min-height:0;padding:18px 20px 22px;display:grid;position:relative;overflow-y:auto}.y5tTyq_projects::-webkit-scrollbar{width:10px}.y5tTyq_projects::-webkit-scrollbar-thumb{background-color:#ffffff29;background-clip:content-box;border:3px solid #0000;border-radius:8px}.y5tTyq_card{--card-accent:#679efe;border:1px solid var(--wb-line);transition:transform .18s var(--ds-ease-in-out), border-color .18s var(--ds-ease-in-out), box-shadow .18s var(--ds-ease-in-out);background:linear-gradient(#ffffff0d,#ffffff03),#ffffff03;border-radius:16px;flex-direction:column;gap:10px;padding:14px 14px 12px;display:flex;position:relative;overflow:hidden}.y5tTyq_card:before{content:\"\";background:linear-gradient(180deg, var(--card-accent), transparent 85%);opacity:.9;width:3px;position:absolute;inset:0 auto 0 0}.y5tTyq_card:hover{border-color:var(--wb-line-strong);transform:translateY(-2px);box-shadow:0 18px 40px #0000006b}.y5tTyq_cardFiles{min-height:380px}.y5tTyq_cardHead{align-items:center;gap:8px;min-width:0;display:flex}.y5tTyq_cardOpen{min-width:0;color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background .16s var(--ds-ease-in-out);background:0 0;border:none;border-radius:8px;flex:1;align-items:center;gap:8px;margin:-2px -4px -2px -2px;padding:2px 4px 2px 2px;display:flex}.y5tTyq_cardOpen:hover:not(:disabled){background:#ffffff0f}.y5tTyq_cardOpen:disabled{cursor:default}.y5tTyq_cardOpen:focus-visible{outline:2px solid var(--wb-accent);outline-offset:1px}.y5tTyq_cardGlyph{border:1px solid var(--wb-line);background:color-mix(in srgb, var(--card-accent) 16%, transparent);width:26px;height:26px;color:var(--card-accent);border-radius:8px;flex:none;justify-content:center;align-items:center;display:inline-flex}.y5tTyq_cardTitle{text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--wb-text);flex:1;font-size:14px;font-weight:600;overflow:hidden}.y5tTyq_faceSwitch{border:1px solid var(--wb-line);background:#ffffff08;border-radius:999px;flex:none;padding:2px;display:inline-flex}.y5tTyq_faceChip{color:var(--wb-text-dim);font:inherit;white-space:nowrap;cursor:pointer;transition:background .14s var(--ds-ease-in-out), color .14s var(--ds-ease-in-out);background:0 0;border:none;border-radius:999px;padding:2px 9px;font-size:11px}.y5tTyq_faceChip:hover{color:var(--wb-text)}.y5tTyq_faceChipActive{background:color-mix(in srgb, var(--card-accent) 22%, transparent);color:var(--wb-text)}.y5tTyq_cardPath{text-overflow:ellipsis;white-space:nowrap;font-family:var(--ds-font-family-code);letter-spacing:-.01em;color:#b7c8fed1;margin:0;font-size:11.5px;overflow:hidden}.y5tTyq_conversationFace{border:1px solid var(--wb-line);background:#ffffff05;border-radius:12px;justify-content:space-between;align-items:center;gap:10px;min-height:74px;padding:10px 12px;display:flex}.y5tTyq_metaRow{align-items:baseline;gap:6px;min-width:0;display:flex}.y5tTyq_metaCount{color:var(--wb-text);font-variant-numeric:tabular-nums;font-size:22px;font-weight:600;line-height:1}.y5tTyq_metaLabel{color:var(--wb-text-faint);font-size:11px}.y5tTyq_cardActions{flex:none;gap:6px;display:flex}.y5tTyq_explorer{border:1px solid var(--wb-line);background:#0003;border-radius:12px;flex-direction:column;flex:1;min-height:0;display:flex;overflow:hidden}.y5tTyq_explorerHead{border-bottom:1px solid var(--wb-line);background:#ffffff08;flex:none;align-items:center;gap:4px;height:26px;padding:0 6px 0 4px;display:flex}.y5tTyq_explorerCaret{color:var(--wb-text-faint);flex:none}.y5tTyq_explorerTitle{text-overflow:ellipsis;white-space:nowrap;letter-spacing:.08em;color:var(--wb-text-dim);flex:none;font-size:11px;font-weight:700;overflow:hidden}.y5tTyq_explorerParent{text-overflow:ellipsis;white-space:nowrap;text-align:right;min-width:0;color:var(--wb-text-faint);flex:1;font-size:10.5px;overflow:hidden}.y5tTyq_explorerTools{flex:none;align-items:center;gap:2px;display:inline-flex}.y5tTyq_explorerTool{width:20px;height:20px;color:var(--wb-text-dim);cursor:pointer;transition:background .14s var(--ds-ease-in-out), color .14s var(--ds-ease-in-out);background:0 0;border:none;border-radius:5px;justify-content:center;align-items:center;padding:0;display:inline-flex}.y5tTyq_explorerTool:hover:not(:disabled){color:var(--wb-text);background:#ffffff1a}.y5tTyq_explorerTool:disabled{color:var(--wb-text-faint);cursor:default;opacity:.5}.y5tTyq_explorerTool:focus-visible,.y5tTyq_explorerRow:focus-visible,.y5tTyq_explorerRetry:focus-visible{outline:1px solid var(--wb-accent);outline-offset:-1px}.y5tTyq_explorerRows{scrollbar-width:thin;scrollbar-color:#ffffff29 transparent;flex:1;min-height:0;margin:0;padding:4px 0;list-style:none;overflow:auto}.y5tTyq_explorerRows::-webkit-scrollbar{width:10px}.y5tTyq_explorerRows::-webkit-scrollbar-thumb{background-color:#ffffff29;background-clip:content-box;border:3px solid #0000;border-radius:8px}.y5tTyq_explorerItem{min-width:0}.y5tTyq_explorerRow{box-sizing:border-box;width:100%;height:22px;color:var(--wb-text);font:inherit;text-align:left;white-space:nowrap;cursor:pointer;background:0 0;border:none;align-items:center;gap:4px;padding:0 6px 0 4px;font-size:12.5px;line-height:22px;display:flex}.y5tTyq_explorerRow:hover{background:#ffffff0e}.y5tTyq_explorerRowSelected{box-shadow:inset 2px 0 0 var(--wb-accent);background:#679efe29}.y5tTyq_explorerRowSelected:hover{background:#679efe38}.y5tTyq_explorerGuide{background-image:linear-gradient(90deg,#ffffff1c 0 1px,#0000 1px);background-repeat:no-repeat;flex:none;align-self:stretch;width:14px}.y5tTyq_explorerGlyph{width:14px;color:var(--wb-text-faint);flex:none;justify-content:center;align-items:center;display:inline-flex}.y5tTyq_explorerRow:hover .y5tTyq_explorerGlyph{color:var(--wb-text-dim)}.y5tTyq_explorerIcon{color:#8ca8d6;flex:none;justify-content:center;align-items:center;width:18px;display:inline-flex}.y5tTyq_explorerRow[data-explorer-kind=file] .y5tTyq_explorerIcon{color:inherit}.y5tTyq_explorerName{text-overflow:ellipsis;flex:1;min-width:0;overflow:hidden}.y5tTyq_explorerSize{color:var(--wb-text-faint);font-variant-numeric:tabular-nums;flex:none;padding-left:8px;font-size:10.5px}.y5tTyq_explorerNoteRow{box-sizing:border-box;height:22px;color:var(--wb-text-faint);align-items:center;gap:4px;padding:0 6px 0 4px;font-size:11.5px;display:flex}.y5tTyq_explorerNoteText{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.y5tTyq_explorerErrorText{text-overflow:ellipsis;white-space:nowrap;color:#f49ac2;flex:1;min-width:0;overflow:hidden}.y5tTyq_explorerRetry{border:1px solid var(--wb-line-strong);height:18px;color:var(--wb-text);font:inherit;cursor:pointer;background:0 0;border-radius:999px;flex:none;padding:0 8px;font-size:10.5px}.y5tTyq_explorerRetry:hover{background:#ffffff1a}.y5tTyq_explorerSpin{animation:1s linear infinite y5tTyq_wbSpin}.y5tTyq_explorerNote{color:var(--wb-text-dim);margin:0;padding:14px 12px;font-size:12px}.y5tTyq_explorerFoot{border-top:1px solid var(--wb-line);color:var(--wb-text-faint);text-overflow:ellipsis;white-space:nowrap;flex:none;margin:0;padding:5px 8px;font-size:10.5px;overflow:hidden}.y5tTyq_picker{--wb-line:#ffffff14;--wb-line-strong:#ffffff24;--wb-text:#e8ecf5;--wb-text-dim:#e8ecf599;--wb-text-faint:#e8ecf561;--wb-accent:#679efe;width:min(560px,92vw);color:var(--wb-text);color-scheme:dark}.y5tTyq_pickerContent{max-height:min(560px,72vh)}.y5tTyq_pickerCrumbs{flex-wrap:wrap;align-items:center;gap:2px;padding:0 0 8px;font-size:12px;display:flex}.y5tTyq_pickerCrumbCell{align-items:center;gap:2px;min-width:0;display:inline-flex}.y5tTyq_pickerCrumbSep{color:var(--wb-text-faint)}.y5tTyq_pickerCrumb{text-overflow:ellipsis;white-space:nowrap;max-width:160px;color:var(--wb-text-dim);font:inherit;cursor:pointer;background:0 0;border:none;border-radius:6px;padding:2px 6px;font-size:12px;overflow:hidden}.y5tTyq_pickerCrumb:hover{color:var(--wb-text);background:#ffffff14}.y5tTyq_pickerCrumbCurrent{color:var(--wb-text);font-weight:600}.y5tTyq_pickerAddress{align-items:center;gap:6px;padding:0 0 8px;display:flex}.y5tTyq_pickerAddressInput{min-width:0;font-family:var(--ds-font-family-code);flex:1;font-size:12px}.y5tTyq_pickerBar{border-bottom:1px solid var(--wb-line);align-items:center;gap:8px;padding:0 0 8px;display:flex}.y5tTyq_pickerPath{text-overflow:ellipsis;white-space:nowrap;min-width:0;font-family:var(--ds-font-family-code);color:#b7c8fed1;flex:1;font-size:11.5px;overflow:hidden}.y5tTyq_pickerToggle{color:var(--wb-text-dim);cursor:pointer;flex:none;align-items:center;gap:5px;font-size:11px;display:inline-flex}.y5tTyq_pickerTool{width:22px;height:22px;color:var(--wb-text-dim);cursor:pointer;background:0 0;border:none;border-radius:6px;flex:none;justify-content:center;align-items:center;padding:0;display:inline-flex}.y5tTyq_pickerTool:hover:not(:disabled){color:var(--wb-text);background:#ffffff1a}.y5tTyq_pickerTool:disabled{opacity:.45;cursor:default}.y5tTyq_pickerCreate{align-items:center;gap:8px;padding:8px 0;display:flex}.y5tTyq_pickerNotice{color:#f7afd3;background:#f472b61f;border:1px solid #f472b64d;border-radius:8px;margin:0 0 8px;padding:6px 8px;font-size:11.5px}.y5tTyq_pickerRows{border:1px solid var(--wb-line);scrollbar-width:thin;scrollbar-color:#ffffff29 transparent;background:#0000003d;border-radius:10px;min-height:180px;max-height:300px;padding:4px 0;overflow:auto}.y5tTyq_pickerRows::-webkit-scrollbar{width:10px}.y5tTyq_pickerRows::-webkit-scrollbar-thumb{background-color:#ffffff29;background-clip:content-box;border:3px solid #0000;border-radius:8px}.y5tTyq_pickerRow{box-sizing:border-box;width:100%;height:26px;color:var(--wb-text);font:inherit;text-align:left;white-space:nowrap;cursor:pointer;background:0 0;border:none;align-items:center;gap:6px;padding:0 10px;font-size:12.5px;display:flex}.y5tTyq_pickerRow:hover{background:#ffffff0f}.y5tTyq_pickerNote{color:var(--wb-text-faint);align-items:center;gap:6px;margin:0;padding:8px 10px;font-size:11.5px;display:flex}.y5tTyq_editor{flex-direction:column;height:100%;min-height:0;font-size:12.5px;display:flex}.y5tTyq_editorHead{border-bottom:1px solid var(--dsw-alias-border-l2,#8080803d);flex:none;align-items:center;gap:6px;padding:6px 8px;display:flex}.y5tTyq_editorName{text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;font-weight:600;overflow:hidden}.y5tTyq_editorDirty{color:var(--dsw-alias-text-warning,#d98c1f);flex:none;font-size:10px}.y5tTyq_editorTools{flex:none;align-items:center;gap:4px;display:inline-flex}.y5tTyq_editorMeta{opacity:.6;font-variant-numeric:tabular-nums;font-size:10.5px}.y5tTyq_editorNotice{color:var(--dsw-alias-text-warning,#a8640f);background:#d98c1f24;flex:none;margin:0;padding:6px 10px;font-size:11.5px}.y5tTyq_editorNote{opacity:.75;flex-direction:column;align-items:flex-start;gap:8px;margin:0;padding:12px 10px;font-size:12px;display:flex}.y5tTyq_editorFailed{color:var(--dsw-alias-text-danger,#d9483b);margin:0}.y5tTyq_editorBody{min-height:0;font-family:var(--ds-font-family-code);flex:1;display:flex;overflow:auto}.y5tTyq_editorGutter{text-align:right;opacity:.4;user-select:none;font-variant-numeric:tabular-nums;flex-direction:column;flex:none;padding:8px 8px 8px 10px;font-size:11.5px;line-height:1.5;display:flex}.y5tTyq_editorLineNo{display:block}.y5tTyq_editorText,.y5tTyq_editorInput{min-width:0;color:inherit;font:inherit;tab-size:2;white-space:pre;background:0 0;border:none;outline:none;flex:1;margin:0;padding:8px 12px 8px 0;font-size:12.5px;line-height:1.5}.y5tTyq_editorText{overflow:visible}.y5tTyq_editorInput{resize:none;white-space:pre;overflow:hidden}.y5tTyq_editorFoot{border-top:1px solid var(--dsw-alias-border-l2,#8080803d);flex:none;align-items:center;gap:8px;padding:6px 8px;display:flex}.y5tTyq_editorHint{text-overflow:ellipsis;white-space:nowrap;opacity:.6;flex:1;min-width:0;font-size:10.5px;overflow:hidden}.y5tTyq_editorChip{text-overflow:ellipsis;white-space:nowrap;overflow:hidden}.y5tTyq_cardFoot{justify-content:space-between;align-items:center;gap:10px;padding-top:2px;display:flex}.y5tTyq_cardUpdated{color:var(--wb-text-faint);font-variant-numeric:tabular-nums;font-size:11px}.y5tTyq_addCard{border:1px dashed var(--wb-line-strong);min-height:190px;color:var(--wb-text-dim);font:inherit;cursor:pointer;transition:border-color .18s var(--ds-ease-in-out), background .18s var(--ds-ease-in-out), transform .18s var(--ds-ease-in-out);background:#ffffff03;border-radius:16px;flex-direction:column;justify-content:center;align-items:center;gap:6px;padding:18px;display:flex}.y5tTyq_addCard:hover:not(:disabled){background:#679efe0f;border-color:#679efe99;transform:translateY(-2px)}.y5tTyq_addCard:disabled{cursor:progress;opacity:.6}.y5tTyq_addGlyph{border:1px solid var(--wb-line-strong);color:#b7c8fe;background:linear-gradient(150deg,#679efe38,#0000);border-radius:14px;justify-content:center;align-items:center;width:44px;height:44px;display:inline-flex}.y5tTyq_addTitle{color:var(--wb-text);font-size:13px}.y5tTyq_addHint{color:var(--wb-text-faint);font-size:11.5px}.y5tTyq_accent_azure{--card-accent:#679efe}.y5tTyq_accent_violet{--card-accent:#a78bfa}.y5tTyq_accent_amber{--card-accent:#f7ad31}.y5tTyq_accent_emerald{--card-accent:#4ed17e}.y5tTyq_accent_rose{--card-accent:#f472b6}.y5tTyq_accent_slate{--card-accent:#979da6}.y5tTyq_empty{border:1px dashed var(--wb-line-strong);text-align:center;background:#ffffff04;border-radius:16px;flex-direction:column;grid-column:1/-1;justify-content:center;align-items:center;gap:8px;padding:56px 24px;display:flex}.y5tTyq_emptyGlyph{border:1px solid var(--wb-line-strong);color:#b7c8fe;background:linear-gradient(150deg,#679efe38,#0000);border-radius:14px;justify-content:center;align-items:center;width:46px;height:46px;display:inline-flex}.y5tTyq_emptyTitle{color:var(--wb-text);margin:6px 0 0;font-size:14px}.y5tTyq_emptyHint{color:var(--wb-text-faint);margin:0 0 10px;font-size:12px}.y5tTyq_panelFoot{border-top:1px solid var(--wb-line);background:#00000038;justify-content:space-between;align-items:center;padding:10px 20px;display:flex;position:relative}.y5tTyq_footHint{color:var(--wb-text-faint);font-size:11px}@media (width<=760px){.y5tTyq_readings{grid-template-columns:repeat(2,minmax(0,1fr))}.y5tTyq_live{display:none}}@keyframes y5tTyq_wbPulse{0%,to{opacity:1}50%{opacity:.35}}@keyframes y5tTyq_wbSpin{to{transform:rotate(360deg)}}@media (prefers-reduced-motion:reduce){.y5tTyq_liveDot,.y5tTyq_explorerSpin{animation:none}.y5tTyq_card,.y5tTyq_addCard{transition:none}}";
+		const tagId = "dsh-workbench/Workbench.module.css";
+		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
+			const tag = document.createElement("style");
+			tag.dataset.plugin = "dsh-workbench";
+			tag.dataset.pluginCss = tagId;
+			tag.textContent = css;
+			document.head.appendChild(tag);
+		}
+		var Workbench_module_css_default = {
+			"accent_amber": "y5tTyq_accent_amber",
+			"accent_azure": "y5tTyq_accent_azure",
+			"accent_emerald": "y5tTyq_accent_emerald",
+			"accent_rose": "y5tTyq_accent_rose",
+			"accent_slate": "y5tTyq_accent_slate",
+			"accent_violet": "y5tTyq_accent_violet",
+			"action": "y5tTyq_action",
+			"addCard": "y5tTyq_addCard",
+			"addGlyph": "y5tTyq_addGlyph",
+			"addHint": "y5tTyq_addHint",
+			"addTitle": "y5tTyq_addTitle",
+			"card": "y5tTyq_card",
+			"cardActions": "y5tTyq_cardActions",
+			"cardFiles": "y5tTyq_cardFiles",
+			"cardFoot": "y5tTyq_cardFoot",
+			"cardGlyph": "y5tTyq_cardGlyph",
+			"cardHead": "y5tTyq_cardHead",
+			"cardOpen": "y5tTyq_cardOpen",
+			"cardPath": "y5tTyq_cardPath",
+			"cardTitle": "y5tTyq_cardTitle",
+			"cardUpdated": "y5tTyq_cardUpdated",
+			"conversationFace": "y5tTyq_conversationFace",
+			"editor": "y5tTyq_editor",
+			"editorBody": "y5tTyq_editorBody",
+			"editorChip": "y5tTyq_editorChip",
+			"editorDirty": "y5tTyq_editorDirty",
+			"editorFailed": "y5tTyq_editorFailed",
+			"editorFoot": "y5tTyq_editorFoot",
+			"editorGutter": "y5tTyq_editorGutter",
+			"editorHead": "y5tTyq_editorHead",
+			"editorHint": "y5tTyq_editorHint",
+			"editorInput": "y5tTyq_editorInput",
+			"editorLineNo": "y5tTyq_editorLineNo",
+			"editorMeta": "y5tTyq_editorMeta",
+			"editorName": "y5tTyq_editorName",
+			"editorNote": "y5tTyq_editorNote",
+			"editorNotice": "y5tTyq_editorNotice",
+			"editorText": "y5tTyq_editorText",
+			"editorTools": "y5tTyq_editorTools",
+			"empty": "y5tTyq_empty",
+			"emptyGlyph": "y5tTyq_emptyGlyph",
+			"emptyHint": "y5tTyq_emptyHint",
+			"emptyTitle": "y5tTyq_emptyTitle",
+			"explorer": "y5tTyq_explorer",
+			"explorerCaret": "y5tTyq_explorerCaret",
+			"explorerErrorText": "y5tTyq_explorerErrorText",
+			"explorerFoot": "y5tTyq_explorerFoot",
+			"explorerGlyph": "y5tTyq_explorerGlyph",
+			"explorerGuide": "y5tTyq_explorerGuide",
+			"explorerHead": "y5tTyq_explorerHead",
+			"explorerIcon": "y5tTyq_explorerIcon",
+			"explorerItem": "y5tTyq_explorerItem",
+			"explorerName": "y5tTyq_explorerName",
+			"explorerNote": "y5tTyq_explorerNote",
+			"explorerNoteRow": "y5tTyq_explorerNoteRow",
+			"explorerNoteText": "y5tTyq_explorerNoteText",
+			"explorerParent": "y5tTyq_explorerParent",
+			"explorerRetry": "y5tTyq_explorerRetry",
+			"explorerRow": "y5tTyq_explorerRow",
+			"explorerRowSelected": "y5tTyq_explorerRowSelected",
+			"explorerRows": "y5tTyq_explorerRows",
+			"explorerSize": "y5tTyq_explorerSize",
+			"explorerSpin": "y5tTyq_explorerSpin",
+			"explorerTitle": "y5tTyq_explorerTitle",
+			"explorerTool": "y5tTyq_explorerTool",
+			"explorerTools": "y5tTyq_explorerTools",
+			"faceChip": "y5tTyq_faceChip",
+			"faceChipActive": "y5tTyq_faceChipActive",
+			"faceSwitch": "y5tTyq_faceSwitch",
+			"footHint": "y5tTyq_footHint",
+			"headActions": "y5tTyq_headActions",
+			"headGlyph": "y5tTyq_headGlyph",
+			"headIdentity": "y5tTyq_headIdentity",
+			"headText": "y5tTyq_headText",
+			"iconOnly": "y5tTyq_iconOnly",
+			"live": "y5tTyq_live",
+			"liveDot": "y5tTyq_liveDot",
+			"metaCount": "y5tTyq_metaCount",
+			"metaLabel": "y5tTyq_metaLabel",
+			"metaRow": "y5tTyq_metaRow",
+			"notice": "y5tTyq_notice",
+			"noticeClose": "y5tTyq_noticeClose",
+			"noticeError": "y5tTyq_noticeError",
+			"noticeErrorText": "y5tTyq_noticeErrorText",
+			"panelFoot": "y5tTyq_panelFoot",
+			"panelHead": "y5tTyq_panelHead",
+			"picker": "y5tTyq_picker",
+			"pickerAddress": "y5tTyq_pickerAddress",
+			"pickerAddressInput": "y5tTyq_pickerAddressInput",
+			"pickerBar": "y5tTyq_pickerBar",
+			"pickerContent": "y5tTyq_pickerContent",
+			"pickerCreate": "y5tTyq_pickerCreate",
+			"pickerCrumb": "y5tTyq_pickerCrumb",
+			"pickerCrumbCell": "y5tTyq_pickerCrumbCell",
+			"pickerCrumbCurrent": "y5tTyq_pickerCrumbCurrent",
+			"pickerCrumbSep": "y5tTyq_pickerCrumbSep",
+			"pickerCrumbs": "y5tTyq_pickerCrumbs",
+			"pickerNote": "y5tTyq_pickerNote",
+			"pickerNotice": "y5tTyq_pickerNotice",
+			"pickerPath": "y5tTyq_pickerPath",
+			"pickerRow": "y5tTyq_pickerRow",
+			"pickerRows": "y5tTyq_pickerRows",
+			"pickerToggle": "y5tTyq_pickerToggle",
+			"pickerTool": "y5tTyq_pickerTool",
+			"projects": "y5tTyq_projects",
+			"reading": "y5tTyq_reading",
+			"readingHint": "y5tTyq_readingHint",
+			"readingLabel": "y5tTyq_readingLabel",
+			"readingValue": "y5tTyq_readingValue",
+			"readings": "y5tTyq_readings",
+			"subtitle": "y5tTyq_subtitle",
+			"title": "y5tTyq_title",
+			"wbPulse": "y5tTyq_wbPulse",
+			"wbSpin": "y5tTyq_wbSpin",
+			"workbench": "y5tTyq_workbench"
+		};
+		//#endregion
+		//#region dsh-workbench/lib/types/client/WorkspaceDirectoryPicker.js
+		/**
+		* The in-app Workspace directory picker.
+		*
+		* A boot composes exactly one directory-picking interaction. When the Host
+		* resolves the **browse** backend there is no OS chooser to drive, `pick` is
+		* refused by design, and the browsing primitives (`listDirectory`,
+		* `createDirectory`) are the only route from "the operator wants a directory"
+		* to an absolute path. This dialog is that route: the same level-by-level
+		* browsing the official dialog performs, drawn as the workbench's own modal.
+		*
+		* It is deliberately not the official dialog: that one is the occupant of
+		* ui-workspace's `*.directoryFlow` holes (a `single` slot each, already filled
+		* by the composed picker surface) and it is opened by the sidebar and
+		* conversation menus' owner-local state. There is no service to raise it from
+		* another plugin, so a panel that wants an add action under the browse backend
+		* has to bring its own.
+		*
+		* The address bar is where this dialog earns its keep: the path is an editable
+		* field, so a directory can be **typed or pasted** — from Explorer, from a
+		* terminal, from a card's own path line — and confirmed with Enter, the way the
+		* OS dialog's address bar works. Browsing stays for everything else.
+		*/
+		/**
+		* Render the picker dialog.
+		* @param props - the browse face, the copy, and the flow's outcomes.
+		* @returns the modal element.
+		*/
+		function WorkspaceDirectoryPicker({ open, t, browseDirectory, makeDirectory, onPicked, onCancel }) {
+			const [level, setLevel] = (0, react.useState)({ state: "loading" });
+			const [showHidden, setShowHidden] = (0, react.useState)(false);
+			const [creating, setCreating] = (0, react.useState)(false);
+			const [folderName, setFolderName] = (0, react.useState)("");
+			const [notice, setNotice] = (0, react.useState)(void 0);
+			const [address, setAddress] = (0, react.useState)("");
+			const controller = (0, react.useRef)(void 0);
+			const alive = (0, react.useRef)(true);
+			(0, react.useEffect)(() => {
+				alive.current = true;
+				return () => {
+					alive.current = false;
+					controller.current?.abort();
+				};
+			}, []);
+			/**
+			* Show one level; an absent path asks the Host for its home directory, which
+			* is also how the dialog opens.
+			* @param path - the directory to show, or undefined for Home.
+			*/
+			const show = (0, react.useCallback)((path) => {
+				controller.current?.abort();
+				const next = new AbortController();
+				controller.current = next;
+				setLevel({ state: "loading" });
+				setNotice(void 0);
+				setAddress(path ?? "");
+				browseDirectory(path, next.signal).then((outcome) => {
+					if (!alive.current || next.signal.aborted) return;
+					setLevel(outcome.ok ? {
+						state: "ready",
+						listing: outcome.value
+					} : {
+						state: "failed",
+						message: outcome.message
+					});
+					if (outcome.ok) setAddress(outcome.value.path);
+				});
+			}, [browseDirectory]);
+			(0, react.useEffect)(() => {
+				if (!open) {
+					controller.current?.abort();
+					return;
+				}
+				setCreating(false);
+				setFolderName("");
+				setShowHidden(false);
+				show(void 0);
+				return () => {
+					controller.current?.abort();
+				};
+			}, [open, show]);
+			const listing = level.state === "ready" ? level.listing : void 0;
+			const crumbs = (0, react.useMemo)(() => listing === void 0 ? [] : pickerCrumbs(listing), [listing]);
+			const rows = (0, react.useMemo)(() => listing === void 0 ? [] : pickerEntries(listing, showHidden), [listing, showHidden]);
+			const parent = (0, react.useMemo)(() => listing === void 0 ? void 0 : parentPathOf(listing.path), [listing]);
+			/**
+			* Go to whatever the address bar holds.
+			*
+			* A typed path is not validated here: the browse primitive is the only thing
+			* that knows what exists, and it answers a structured failure that lands in
+			* this dialog's own notice line.
+			* @param path - the typed or pasted path.
+			*/
+			const go = (path) => {
+				const wanted = path.trim();
+				if (wanted === "") return;
+				show(wanted);
+			};
+			/** Create a folder in the listed level, then move into it. */
+			const create = () => {
+				if (listing === void 0) return;
+				const name = folderName.trim() === "" ? t("picker.untitledFolder") : folderName.trim();
+				setNotice(void 0);
+				makeDirectory(listing.path, name).then((outcome) => {
+					if (!alive.current) return;
+					if (!outcome.ok) {
+						setNotice(outcome.message);
+						return;
+					}
+					setCreating(false);
+					setFolderName("");
+					show(outcome.path);
+				});
+			};
+			return (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+				open,
+				onClose: onCancel,
+				title: t("picker.title"),
+				closeLabel: t("picker.cancel"),
+				className: Workbench_module_css_default.picker ?? "",
+				contentClassName: Workbench_module_css_default.pickerContent ?? "",
+				footer: (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+					variant: "outline",
+					size: "sm",
+					onClick: onCancel,
+					children: t("picker.cancel")
+				}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+					variant: "primary",
+					size: "sm",
+					disabled: listing === void 0 || creating,
+					onClick: () => {
+						if (listing !== void 0) onPicked(listing.path);
+					},
+					children: t("picker.choose")
+				})] }),
+				children: [
+					(0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.pickerAddress,
+						children: [
+							(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+								className: Workbench_module_css_default.pickerAddressInput ?? "",
+								value: address,
+								spellCheck: false,
+								"aria-label": t("picker.path"),
+								placeholder: t("picker.pathPlaceholder"),
+								onChange: (event) => {
+									setAddress(event.target.value);
+								},
+								onKeyDown: (event) => {
+									if (event.key === "Enter") go(address);
+									if (event.key === "Escape") setAddress(listing?.path ?? "");
+								}
+							}),
+							(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+								variant: "outline",
+								size: "sm",
+								onClick: () => {
+									go(address);
+								},
+								children: t("picker.go")
+							}),
+							(0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: Workbench_module_css_default.pickerTool,
+								"aria-label": t("picker.up"),
+								title: t("picker.up"),
+								disabled: parent === void 0,
+								onClick: () => {
+									if (parent !== void 0) show(parent);
+								},
+								children: "↑"
+							})
+						]
+					}),
+					(0, react_jsx_runtime.jsx)("div", {
+						className: Workbench_module_css_default.pickerCrumbs,
+						children: crumbs.map((crumb, index) => (0, react_jsx_runtime.jsxs)("span", {
+							className: Workbench_module_css_default.pickerCrumbCell,
+							children: [index > 0 && (0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.pickerCrumbSep,
+								"aria-hidden": "true",
+								children: "›"
+							}), (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: `${Workbench_module_css_default.pickerCrumb} ${index === crumbs.length - 1 ? Workbench_module_css_default.pickerCrumbCurrent : ""}`,
+								title: crumb.path,
+								onClick: () => {
+									show(crumb.path);
+								},
+								children: crumb.home ? t("picker.home") : crumb.name
+							})]
+						}, crumb.path))
+					}),
+					(0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.pickerBar,
+						children: [
+							(0, react_jsx_runtime.jsxs)("label", {
+								className: Workbench_module_css_default.pickerToggle,
+								children: [(0, react_jsx_runtime.jsx)("input", {
+									type: "checkbox",
+									checked: showHidden,
+									onChange: (event) => {
+										setShowHidden(event.target.checked);
+									}
+								}), t("picker.showHidden")]
+							}),
+							(0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: Workbench_module_css_default.pickerTool,
+								"aria-label": t("picker.reload"),
+								title: t("picker.reload"),
+								onClick: () => {
+									show(listing?.path);
+								},
+								children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline16, { size: 13 })
+							}),
+							(0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: Workbench_module_css_default.pickerTool,
+								"aria-label": t("picker.newFolder"),
+								title: t("picker.newFolder"),
+								disabled: listing === void 0,
+								onClick: () => {
+									setCreating(true);
+									setNotice(void 0);
+								},
+								children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 13 })
+							})
+						]
+					}),
+					creating && (0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.pickerCreate,
+						children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Input, {
+							autoFocus: true,
+							value: folderName,
+							placeholder: t("picker.folderName"),
+							"aria-label": t("picker.folderName"),
+							onChange: (event) => {
+								setFolderName(event.target.value);
+							},
+							onKeyDown: (event) => {
+								if (event.key === "Enter") create();
+								if (event.key === "Escape") {
+									setCreating(false);
+									setFolderName("");
+								}
+							}
+						}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							variant: "primary",
+							size: "sm",
+							onClick: create,
+							children: t("picker.create")
+						})]
+					}),
+					notice !== void 0 && (0, react_jsx_runtime.jsx)("p", {
+						className: Workbench_module_css_default.pickerNotice,
+						role: "alert",
+						children: notice
+					}),
+					(0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.pickerRows,
+						role: "listbox",
+						"aria-label": t("picker.title"),
+						children: [
+							level.state === "loading" && (0, react_jsx_runtime.jsxs)("p", {
+								className: Workbench_module_css_default.pickerNote,
+								children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLoadingOutline16, {
+									size: 13,
+									className: Workbench_module_css_default.explorerSpin
+								}), t("picker.loading")]
+							}),
+							level.state === "failed" && (0, react_jsx_runtime.jsxs)("p", {
+								className: Workbench_module_css_default.pickerNote,
+								children: [(0, react_jsx_runtime.jsx)("span", {
+									className: Workbench_module_css_default.explorerErrorText,
+									children: level.message
+								}), (0, react_jsx_runtime.jsx)("button", {
+									type: "button",
+									className: Workbench_module_css_default.explorerRetry,
+									onClick: () => {
+										show(listing?.path);
+									},
+									children: t("tree.retry")
+								})]
+							}),
+							level.state === "ready" && rows.length === 0 && (0, react_jsx_runtime.jsx)("p", {
+								className: Workbench_module_css_default.pickerNote,
+								children: t("picker.empty")
+							}),
+							rows.map((row) => (0, react_jsx_runtime.jsxs)("button", {
+								type: "button",
+								className: Workbench_module_css_default.pickerRow,
+								title: row.path,
+								onClick: () => {
+									show(row.path);
+								},
+								children: [(0, react_jsx_runtime.jsx)("span", {
+									className: Workbench_module_css_default.explorerIcon,
+									"aria-hidden": "true",
+									children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderClose16, { size: 15 })
+								}), (0, react_jsx_runtime.jsx)("span", {
+									className: Workbench_module_css_default.explorerName,
+									children: row.name
+								})]
+							}, row.path)),
+							listing?.truncated === true && (0, react_jsx_runtime.jsx)("p", {
+								className: Workbench_module_css_default.pickerNote,
+								children: t("picker.truncated")
+							})
+						]
+					})
+				]
+			});
+		}
+		//#endregion
+		//#region dsh-workbench/lib/types/client/Workbench.js
+		/**
+		* Workbench main panel: the control room as a first-class application panel.
+		*
+		* This is the shape the app gives a workspace — a selectable surface that takes
+		* the center column — rather than a floating overlay. The panel registers under
+		* the `main` key `workbench`, and `sidebar.panellist` draws its row in the
+		* global panel list, so the workbench toggles like every other panel and never
+		* covers the conversation.
+		*
+		* A card is a Host Workspace, read through the global `useWorkspaces` hook, so
+		* the grid mirrors the registry: adding a Workspace anywhere adds a card,
+		* removing one removes it, and the workbench keeps no roster of its own. The
+		* empty plus card drives the same directory-picking flow the sidebar's own
+		* "Add workspace…" entry uses, so both routes end in one Host create call.
+		*
+		* A card's Files face is a VS Code-shaped explorer: one flat row list carrying
+		* per-row depth, indent guides, rotating chevrons, folder and file-type glyphs,
+		* the reader's selection, and arrow-key traversal. A level is listed when its
+		* directory is first expanded and never for the whole tree at once.
+		*/
+		/**
+		* The file explorer: the workspace root and whatever the reader has opened
+		* under it, as one flat VS Code-shaped list.
+		*
+		* State is the reader's alone — which levels are listed, which directories are
+		* expanded, and which row is selected. Every listing goes out through the
+		* injected `listDirectory`, which resolves the Remote namespace per call, so a
+		* level asked for before that namespace mounts reports a failed level with a
+		* retry rather than losing the whole face. Each level's request is aborted when
+		* it is superseded, when its directory collapses, or when the card unmounts.
+		*
+		* Gestures follow the editor too: one click selects, a directory's click also
+		* opens it, and a file opens on double click (or Enter) into the right column.
+		* @param props - the root to browse, its Session, the copy, and the two faces.
+		* @returns the explorer element.
+		*/
+		function FileExplorer({ root, sessionId, t, listDirectory, available, onOpenFile }) {
+			const [levels, setLevels] = (0, react.useState)(() => /* @__PURE__ */ new Map());
+			const [expanded, setExpanded] = (0, react.useState)(() => /* @__PURE__ */ new Set());
+			const [selected, setSelected] = (0, react.useState)(void 0);
+			const listRef = (0, react.useRef)(null);
+			const controllers = (0, react.useRef)(/* @__PURE__ */ new Map());
+			const alive = (0, react.useRef)(true);
+			(0, react.useEffect)(() => {
+				alive.current = true;
+				const pending = controllers.current;
+				return () => {
+					alive.current = false;
+					for (const controller of pending.values()) controller.abort();
+					pending.clear();
+				};
+			}, []);
+			const load = (0, react.useCallback)((path) => {
+				if (sessionId === void 0) return;
+				controllers.current.get(path)?.abort();
+				const controller = new AbortController();
+				controllers.current.set(path, controller);
+				setLevels((current) => new Map(current).set(path, {
+					status: "loading",
+					entries: [],
+					truncated: false
+				}));
+				listDirectory(sessionId, path, controller.signal).then((result) => {
+					if (!alive.current || controller.signal.aborted) return;
+					controllers.current.delete(path);
+					setLevels((current) => new Map(current).set(path, result.value));
+				}).catch(() => {
+					if (!alive.current || controller.signal.aborted) return;
+					controllers.current.delete(path);
+					setLevels((current) => new Map(current).set(path, {
+						status: "error",
+						entries: [],
+						truncated: false,
+						error: t("tree.error.other")
+					}));
+				});
+			}, [
+				listDirectory,
+				sessionId,
+				t
+			]);
+			(0, react.useEffect)(() => {
+				setLevels(/* @__PURE__ */ new Map());
+				setExpanded(/* @__PURE__ */ new Set());
+				setSelected(void 0);
+				for (const controller of controllers.current.values()) controller.abort();
+				controllers.current.clear();
+				load(root);
+			}, [load, root]);
+			const rows = (0, react.useMemo)(() => explorerRows(root, levels, expanded), [
+				root,
+				levels,
+				expanded
+			]);
+			const { indexes, entryRows } = (0, react.useMemo)(() => {
+				const map = /* @__PURE__ */ new Map();
+				const entries = [];
+				for (const row of rows) {
+					if (row.kind !== "entry") continue;
+					map.set(row.path, entries.length);
+					entries.push(row);
+				}
+				return {
+					indexes: map,
+					entryRows: entries
+				};
+			}, [rows]);
+			const rowCount = entryRows.length;
+			const toggle = (0, react.useCallback)((row) => {
+				setSelected(row.path);
+				if (row.type !== "directory") return;
+				setExpanded((current) => {
+					const next = new Set(current);
+					if (next.has(row.path)) next.delete(row.path);
+					else next.add(row.path);
+					return next;
+				});
+				if (!row.expanded && !levels.has(row.path)) load(row.path);
+			}, [levels, load]);
+			/** Drop every listed level and ask again for the reader's open directories. */
+			const reload = (0, react.useCallback)(() => {
+				const open = [...expanded];
+				setLevels(/* @__PURE__ */ new Map());
+				for (const path of open) load(path);
+				load(root);
+			}, [
+				expanded,
+				load,
+				root
+			]);
+			const focusRow = (index) => {
+				(listRef.current?.querySelector(`[data-explorer-index="${index}"]`))?.focus();
+			};
+			/**
+			* VS Code's traversal: up and down move the selection, right opens a
+			* directory or steps into it, left closes it or steps out to its parent, and
+			* Enter opens a file the way a double click does.
+			* @param event - the row's key event.
+			* @param index - the row's position among the focusable rows.
+			* @param row - the row itself.
+			*/
+			const onKeyDown = (event, index, row) => {
+				switch (event.key) {
+					case "Enter":
+						if (row.type === "file") {
+							onOpenFile(row.path);
+							break;
+						}
+						return;
+					case "ArrowDown":
+						focusRow(Math.min(index + 1, rowCount - 1));
+						break;
+					case "ArrowUp":
+						focusRow(Math.max(index - 1, 0));
+						break;
+					case "Home":
+						focusRow(0);
+						break;
+					case "End":
+						focusRow(rowCount - 1);
+						break;
+					case "ArrowRight":
+						if (row.type === "directory" && !row.expanded) toggle(row);
+						else if (row.type === "directory") focusRow(index + 1);
+						else return;
+						break;
+					case "ArrowLeft":
+						if (row.type === "directory" && row.expanded) {
+							toggle(row);
+							break;
+						}
+						for (let back = index - 1; back >= 0; back -= 1) {
+							const candidate = entryRows[back];
+							if (candidate !== void 0 && candidate.depth === row.depth - 1) {
+								focusRow(back);
+								break;
+							}
+						}
+						break;
+					default: return;
+				}
+				event.preventDefault();
+			};
+			const { directory, name } = splitPath(root);
+			if (sessionId === void 0) return (0, react_jsx_runtime.jsx)("div", {
+				className: Workbench_module_css_default.explorer,
+				children: (0, react_jsx_runtime.jsx)("p", {
+					className: Workbench_module_css_default.explorerNote,
+					"data-explorer-state": "no-session",
+					children: t("tree.noSession")
+				})
+			});
+			if (!available) return (0, react_jsx_runtime.jsx)("div", {
+				className: Workbench_module_css_default.explorer,
+				children: (0, react_jsx_runtime.jsx)("p", {
+					className: Workbench_module_css_default.explorerNote,
+					"data-explorer-state": "unavailable",
+					children: t("tree.unavailable")
+				})
+			});
+			return (0, react_jsx_runtime.jsxs)("div", {
+				className: Workbench_module_css_default.explorer,
+				"data-explorer-root": root,
+				children: [
+					(0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.explorerHead,
+						children: [
+							(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, {
+								size: 12,
+								className: Workbench_module_css_default.explorerCaret
+							}),
+							(0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.explorerTitle,
+								title: root,
+								children: name.toUpperCase()
+							}),
+							(0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.explorerParent,
+								title: root,
+								children: directory
+							}),
+							(0, react_jsx_runtime.jsxs)("span", {
+								className: Workbench_module_css_default.explorerTools,
+								children: [(0, react_jsx_runtime.jsx)("button", {
+									type: "button",
+									className: Workbench_module_css_default.explorerTool,
+									"aria-label": t("tree.collapseAll"),
+									title: t("tree.collapseAll"),
+									disabled: expanded.size === 0,
+									onClick: () => {
+										setExpanded(/* @__PURE__ */ new Set());
+									},
+									children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronUpOutline14, { size: 13 })
+								}), (0, react_jsx_runtime.jsx)("button", {
+									type: "button",
+									className: Workbench_module_css_default.explorerTool,
+									"aria-label": t("tree.reload"),
+									title: t("tree.reload"),
+									onClick: reload,
+									children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline16, { size: 13 })
+								})]
+							})
+						]
+					}),
+					(0, react_jsx_runtime.jsx)("ul", {
+						className: Workbench_module_css_default.explorerRows,
+						ref: listRef,
+						role: "tree",
+						"aria-label": name,
+						children: rows.map((row) => row.kind === "entry" ? (0, react_jsx_runtime.jsx)(ExplorerEntryRow, {
+							row,
+							index: indexes.get(row.path) ?? 0,
+							selected: selected === row.path,
+							t,
+							onSelect: toggle,
+							onOpenFile,
+							onKeyDown
+						}, row.path) : (0, react_jsx_runtime.jsx)(ExplorerNoteRow, {
+							row,
+							t,
+							onRetry: reload
+						}, `${row.note}:${row.path}`))
+					}),
+					(0, react_jsx_runtime.jsx)("p", {
+						className: Workbench_module_css_default.explorerFoot,
+						children: t("tree.hint")
+					})
+				]
+			});
+		}
+		/** One entry row: guides, chevron, glyph, name, and the size of a file. */
+		function ExplorerEntryRow({ row, index, selected, t, onSelect, onOpenFile, onKeyDown }) {
+			return (0, react_jsx_runtime.jsx)("li", {
+				className: Workbench_module_css_default.explorerItem,
+				role: "treeitem",
+				"aria-expanded": row.type === "directory" ? row.expanded : void 0,
+				children: (0, react_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: `${Workbench_module_css_default.explorerRow} ${selected ? Workbench_module_css_default.explorerRowSelected : ""}`,
+					"data-explorer-index": index,
+					"data-explorer-kind": row.type,
+					title: row.type === "file" ? `${row.path}\n${t("file.open")}` : row.path,
+					onClick: () => {
+						onSelect(row);
+					},
+					onDoubleClick: () => {
+						if (row.type === "file") onOpenFile(row.path);
+					},
+					onKeyDown: (event) => {
+						onKeyDown(event, index, row);
+					},
+					children: [
+						Array.from({ length: row.depth }, (_, level) => (0, react_jsx_runtime.jsx)("span", {
+							className: Workbench_module_css_default.explorerGuide,
+							"aria-hidden": "true"
+						}, level)),
+						(0, react_jsx_runtime.jsx)("span", {
+							className: Workbench_module_css_default.explorerGlyph,
+							"aria-hidden": "true",
+							children: row.type === "directory" ? row.expanded ? (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, { size: 12 }) : (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronRightOutline14, { size: 12 }) : null
+						}),
+						(0, react_jsx_runtime.jsx)("span", {
+							className: Workbench_module_css_default.explorerIcon,
+							"aria-hidden": "true",
+							children: row.type === "directory" ? row.expanded ? (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpen16, { size: 15 }) : (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderClose16, { size: 15 }) : row.type === "file" ? (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.FileTypeIcon, {
+								path: row.name,
+								size: 15
+							}) : (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconWarningOutline16, { size: 13 })
+						}),
+						(0, react_jsx_runtime.jsx)("span", {
+							className: Workbench_module_css_default.explorerName,
+							children: row.name
+						}),
+						row.type === "file" && (0, react_jsx_runtime.jsx)("span", {
+							className: Workbench_module_css_default.explorerSize,
+							children: sizeText(row.size)
+						})
+					]
+				})
+			});
+		}
+		/** One note row: why a level has nothing to show, and how to ask again. */
+		function ExplorerNoteRow({ row, t, onRetry }) {
+			const indent = Array.from({ length: row.depth }, (_, level) => (0, react_jsx_runtime.jsx)("span", {
+				className: Workbench_module_css_default.explorerGuide,
+				"aria-hidden": "true"
+			}, level));
+			if (row.note === "failed") return (0, react_jsx_runtime.jsx)("li", {
+				className: Workbench_module_css_default.explorerItem,
+				"data-explorer-note": "failed",
+				children: (0, react_jsx_runtime.jsxs)("span", {
+					className: Workbench_module_css_default.explorerNoteRow,
+					children: [
+						indent,
+						(0, react_jsx_runtime.jsx)("span", {
+							className: Workbench_module_css_default.explorerErrorText,
+							children: row.error ?? ""
+						}),
+						(0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: Workbench_module_css_default.explorerRetry,
+							onClick: onRetry,
+							children: t("tree.retry")
+						})
+					]
+				})
+			});
+			return (0, react_jsx_runtime.jsx)("li", {
+				className: Workbench_module_css_default.explorerItem,
+				"data-explorer-note": row.note,
+				children: (0, react_jsx_runtime.jsxs)("span", {
+					className: Workbench_module_css_default.explorerNoteRow,
+					children: [
+						indent,
+						row.note === "loading" && (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLoadingOutline16, {
+							size: 13,
+							className: Workbench_module_css_default.explorerSpin
+						}),
+						(0, react_jsx_runtime.jsx)("span", {
+							className: Workbench_module_css_default.explorerNoteText,
+							children: row.note === "loading" ? t("tree.loading") : row.note === "empty" ? t("tree.empty") : t("tree.truncated")
+						})
+					]
+				})
+			});
+		}
+		/** `HH:MM` of an ISO instant, or the raw value when it does not parse. */
+		function shortTime(iso) {
+			const at = new Date(iso);
+			if (Number.isNaN(at.getTime())) return iso;
+			return `${at.getHours().toString().padStart(2, "0")}:${at.getMinutes().toString().padStart(2, "0")}`;
+		}
+		/**
+		* The Workspace rows a card grid renders.
+		*
+		* Split out of the component so the degraded path — a composition that mounts no
+		* Workspace UI, so the snapshot source is absent — is a plain function that can
+		* be exercised without a renderer, and so the component never reads a field off
+		* an absent snapshot.
+		* @param snapshot - the Workspace snapshot, or its absence.
+		* @returns the rows, empty when there is no snapshot.
+		*/
+		function workspaceItems(snapshot) {
+			return snapshot?.items ?? [];
+		}
+		/**
+		* Selector hook over an empty Workspace snapshot.
+		*
+		* The panel calls its snapshot hook unconditionally (a Hook cannot be skipped),
+		* so when the composition provides none this standby answers the empty grid
+		* instead of throwing.
+		*/
+		const NO_WORKSPACES = ((selector) => selector({
+			items: [],
+			archivedSessionIds: []
+		}));
+		/**
+		* One Workspace card: its identity, a Conversation/Files switch, and whichever
+		* face is selected.
+		*
+		* The Files face browses the Workspace's own path through the first Session
+		* accounted to it, because the Host confines a listing to that Session's
+		* workspace root, and a file opens in the right column the way the official
+		* file tree opens it. Which controls appear is the capability snapshot's call,
+		* not this card's: an action whose service is not mounted is drawn disabled
+		* rather than missing, so the card never changes shape as services come and go.
+		* @param props - the Workspace, its order index, the capabilities, and the faces.
+		* @returns the card element.
+		*/
+		function WorkspaceCard({ workspace, index, t, capability, listDirectory, onOpen, onStart, onRemove, onOpenFile }) {
+			const [face, setFace] = (0, react.useState)("conversation");
+			const accent = accentFor(index);
+			const sessionId = workspace.sessionIds[0];
+			const sessions = workspace.sessionIds.length;
+			return (0, react_jsx_runtime.jsxs)("article", {
+				className: `${Workbench_module_css_default.card} ${Workbench_module_css_default[`accent_${accent}`] ?? ""} ${face === "files" ? Workbench_module_css_default.cardFiles : ""}`,
+				children: [
+					(0, react_jsx_runtime.jsxs)("header", {
+						className: Workbench_module_css_default.cardHead,
+						children: [
+							(0, react_jsx_runtime.jsxs)("button", {
+								type: "button",
+								className: Workbench_module_css_default.cardOpen,
+								disabled: !capability.navigation,
+								title: `${t("card.activate")} — ${workspace.path}`,
+								onClick: onOpen,
+								children: [(0, react_jsx_runtime.jsx)("span", {
+									className: Workbench_module_css_default.cardGlyph,
+									"aria-hidden": "true",
+									children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderClose16, { size: 16 })
+								}), (0, react_jsx_runtime.jsx)("span", {
+									className: Workbench_module_css_default.cardTitle,
+									children: workspace.title
+								})]
+							}),
+							(0, react_jsx_runtime.jsxs)("div", {
+								className: Workbench_module_css_default.faceSwitch,
+								children: [(0, react_jsx_runtime.jsx)("button", {
+									type: "button",
+									className: `${Workbench_module_css_default.faceChip} ${face === "conversation" ? Workbench_module_css_default.faceChipActive : ""}`,
+									"aria-pressed": face === "conversation",
+									onClick: () => {
+										setFace("conversation");
+									},
+									children: t("card.view.conversation")
+								}), (0, react_jsx_runtime.jsx)("button", {
+									type: "button",
+									className: `${Workbench_module_css_default.faceChip} ${face === "files" ? Workbench_module_css_default.faceChipActive : ""}`,
+									"aria-pressed": face === "files",
+									onClick: () => {
+										setFace("files");
+									},
+									children: t("card.view.files")
+								})]
+							}),
+							capability.workspaces && (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: Workbench_module_css_default.iconOnly,
+								"aria-label": t("card.remove"),
+								title: `${t("card.remove")} — ${t("card.remove.hint")}`,
+								onClick: onRemove,
+								children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, { size: 14 })
+							})
+						]
+					}),
+					(0, react_jsx_runtime.jsx)("p", {
+						className: Workbench_module_css_default.cardPath,
+						title: workspace.path,
+						children: workspace.path
+					}),
+					face === "conversation" ? (0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.conversationFace,
+						children: [(0, react_jsx_runtime.jsxs)("div", {
+							className: Workbench_module_css_default.metaRow,
+							children: [(0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.metaCount,
+								children: sessions
+							}), (0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.metaLabel,
+								children: t("card.sessions")
+							})]
+						}), (0, react_jsx_runtime.jsx)("div", {
+							className: Workbench_module_css_default.cardActions,
+							children: sessions > 0 ? (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: Workbench_module_css_default.action,
+								disabled: !capability.navigation,
+								onClick: onOpen,
+								children: t("card.open")
+							}) : (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: Workbench_module_css_default.action,
+								disabled: !capability.navigation,
+								onClick: onStart,
+								children: t("card.start")
+							})
+						})]
+					}) : (0, react_jsx_runtime.jsx)(FileExplorer, {
+						root: workspace.path,
+						sessionId,
+						t,
+						listDirectory,
+						available: capability.files,
+						onOpenFile
+					}),
+					(0, react_jsx_runtime.jsx)("footer", {
+						className: Workbench_module_css_default.cardFoot,
+						children: (0, react_jsx_runtime.jsxs)("span", {
+							className: Workbench_module_css_default.cardUpdated,
+							children: [
+								t("card.updated"),
+								" ",
+								shortTime(workspace.updatedAt)
+							]
+						})
+					})
+				]
+			});
+		}
+		/**
+		* Render the control room as the `workbench` main panel.
+		* @param props - the `main` runtime share (carrying `useWorkspaces`) plus this plugin's face.
+		* @returns the panel element.
+		*/
+		function WorkbenchPanel({ wt: t, pickWorkspace, registerWorkspace, browseDirectory, makeDirectory, openFile, selectSession, showConversation, openWorkspace, startSession, removeWorkspace, listDirectory, useWorkspaces, useCapability }) {
+			const [adding, setAdding] = (0, react.useState)(false);
+			const [picking, setPicking] = (0, react.useState)(false);
+			const [error, setError] = (0, react.useState)(void 0);
+			const [now, setNow] = (0, react.useState)(() => /* @__PURE__ */ new Date());
+			const workspaces = workspaceItems((useWorkspaces ?? NO_WORKSPACES)((state) => state));
+			const capability = useCapability((state) => state);
+			const canAdd = capability.workspaces && (capability.picker || capability.navigation);
+			(0, react.useEffect)(() => {
+				const timer = window.setInterval(() => {
+					setNow(/* @__PURE__ */ new Date());
+				}, 1e3);
+				return () => {
+					window.clearInterval(timer);
+				};
+			}, []);
+			/**
+			* Act on one add outcome. Failures are shown, never swallowed: a picker that
+			* refuses and a Host that rejects both used to leave the button looking dead.
+			* @param outcome - what the flow reported.
+			*/
+			const settle = (0, react.useCallback)((outcome) => {
+				switch (outcome.kind) {
+					case "browse":
+						setPicking(true);
+						break;
+					case "failed":
+						setError({
+							label: t("notice.addFailed"),
+							message: outcome.message
+						});
+						break;
+					default: break;
+				}
+			}, [t]);
+			const onAdd = (0, react.useCallback)(() => {
+				if (!canAdd) return;
+				setError(void 0);
+				setAdding(true);
+				pickWorkspace().then(settle).finally(() => {
+					setAdding(false);
+				});
+			}, [
+				canAdd,
+				pickWorkspace,
+				settle
+			]);
+			/** Adopt the directory the in-app picker confirmed. */
+			const onPicked = (0, react.useCallback)((path) => {
+				setPicking(false);
+				setAdding(true);
+				registerWorkspace(path).then(settle).finally(() => {
+					setAdding(false);
+				});
+			}, [registerWorkspace, settle]);
+			/**
+			* Show one file of one card in the right column.
+			*
+			* The right column is not merely session content: `ui-sidebar-right` mounts
+			* its session seat **only while the Conversation is the selected main panel**
+			* (`RightbarRoot` returns null for any global panel). The workbench *is* a
+			* global panel, so the file cannot go anywhere until the column is handed
+			* over: the first refusal selects this Workspace's own session, selects the
+			* Conversation, and then polls, because the seat appears one render later and
+			* the session may still be loading.
+			* @param workspace - the card the file belongs to.
+			* @param path - the file's absolute path.
+			*/
+			const openCardFile = (0, react.useCallback)((workspace, path) => {
+				const sessionId = workspace.sessionIds[0];
+				if (sessionId === void 0) {
+					setError({
+						label: t("notice.openFailed"),
+						message: t("file.noSession")
+					});
+					return;
+				}
+				const attempt = (tries) => {
+					const outcome = openFile(sessionId, path);
+					if (outcome.ok) {
+						setError(void 0);
+						return;
+					}
+					if (outcome.code !== "pane/no-session") {
+						setError({
+							label: t("notice.openFailed"),
+							message: outcome.message
+						});
+						return;
+					}
+					if (tries === 0) {
+						if (!selectSession(sessionId)) openWorkspace(workspace.workspaceId);
+						showConversation();
+					}
+					if (tries >= 25) {
+						setError({
+							label: t("notice.openFailed"),
+							message: outcome.message
+						});
+						return;
+					}
+					window.setTimeout(() => {
+						attempt(tries + 1);
+					}, 200);
+				};
+				attempt(0);
+			}, [
+				openFile,
+				openWorkspace,
+				selectSession,
+				showConversation,
+				t
+			]);
+			const readings = (0, react.useMemo)(() => {
+				const sessions = workspaces.reduce((total, workspace) => total + workspace.sessionIds.length, 0);
+				const latest = workspaces.reduce((newest, workspace) => newest === void 0 || workspace.updatedAt > newest ? workspace.updatedAt : newest, void 0);
+				const clock = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+				return [
+					{
+						id: "workspaces",
+						label: t("metric.workspaces"),
+						value: `${workspaces.length}`,
+						hint: t("metric.workspaces.hint")
+					},
+					{
+						id: "sessions",
+						label: t("metric.sessions"),
+						value: `${sessions}`,
+						hint: t("metric.sessions.hint")
+					},
+					{
+						id: "recent",
+						label: t("metric.recent"),
+						value: latest === void 0 ? "—" : shortTime(latest),
+						hint: t("metric.recent.hint")
+					},
+					{
+						id: "clock",
+						label: t("metric.clock"),
+						value: clock,
+						hint: ""
+					}
+				];
+			}, [
+				workspaces,
+				now,
+				t
+			]);
+			return (0, react_jsx_runtime.jsxs)("div", {
+				className: Workbench_module_css_default.workbench,
+				role: "region",
+				"aria-label": t("title"),
+				children: [
+					(0, react_jsx_runtime.jsxs)("header", {
+						className: Workbench_module_css_default.panelHead,
+						children: [(0, react_jsx_runtime.jsxs)("div", {
+							className: Workbench_module_css_default.headIdentity,
+							children: [(0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.headGlyph,
+								"aria-hidden": "true",
+								children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconGaugeOutline16, { size: 18 })
+							}), (0, react_jsx_runtime.jsxs)("div", {
+								className: Workbench_module_css_default.headText,
+								children: [(0, react_jsx_runtime.jsx)("h2", {
+									className: Workbench_module_css_default.title,
+									children: t("title")
+								}), (0, react_jsx_runtime.jsx)("p", {
+									className: Workbench_module_css_default.subtitle,
+									children: t("subtitle")
+								})]
+							})]
+						}), (0, react_jsx_runtime.jsxs)("div", {
+							className: Workbench_module_css_default.headActions,
+							children: [
+								(0, react_jsx_runtime.jsxs)("span", {
+									className: Workbench_module_css_default.live,
+									children: [(0, react_jsx_runtime.jsx)("span", {
+										className: Workbench_module_css_default.liveDot,
+										"aria-hidden": "true"
+									}), t("live")]
+								}),
+								(0, react_jsx_runtime.jsxs)("button", {
+									type: "button",
+									className: Workbench_module_css_default.action,
+									disabled: adding || !canAdd,
+									onClick: onAdd,
+									children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 14 }), t("action.add")]
+								}),
+								(0, react_jsx_runtime.jsxs)("button", {
+									type: "button",
+									className: Workbench_module_css_default.action,
+									onClick: () => {
+										setNow(/* @__PURE__ */ new Date());
+									},
+									children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline16, { size: 14 }), t("action.refresh")]
+								})
+							]
+						})]
+					}),
+					!canAdd && (0, react_jsx_runtime.jsx)("p", {
+						className: Workbench_module_css_default.notice,
+						children: t("notice.noWorkspaceService")
+					}),
+					error !== void 0 && (0, react_jsx_runtime.jsxs)("p", {
+						className: Workbench_module_css_default.noticeError,
+						role: "alert",
+						children: [(0, react_jsx_runtime.jsxs)("span", {
+							className: Workbench_module_css_default.noticeErrorText,
+							children: [
+								error.label,
+								": ",
+								error.message
+							]
+						}), (0, react_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: Workbench_module_css_default.noticeClose,
+							"aria-label": t("notice.dismiss"),
+							onClick: () => {
+								setError(void 0);
+							},
+							children: "✕"
+						})]
+					}),
+					(0, react_jsx_runtime.jsx)("section", {
+						className: Workbench_module_css_default.readings,
+						"aria-label": t("metrics.label"),
+						children: readings.map((reading) => (0, react_jsx_runtime.jsxs)("div", {
+							className: Workbench_module_css_default.reading,
+							children: [
+								(0, react_jsx_runtime.jsx)("span", {
+									className: Workbench_module_css_default.readingLabel,
+									children: reading.label
+								}),
+								(0, react_jsx_runtime.jsx)("span", {
+									className: Workbench_module_css_default.readingValue,
+									children: reading.value
+								}),
+								reading.hint !== "" && (0, react_jsx_runtime.jsx)("span", {
+									className: Workbench_module_css_default.readingHint,
+									children: reading.hint
+								})
+							]
+						}, reading.id))
+					}),
+					(0, react_jsx_runtime.jsxs)("section", {
+						className: Workbench_module_css_default.projects,
+						"aria-label": t("projects.label"),
+						children: [
+							workspaces.length === 0 && (0, react_jsx_runtime.jsxs)("div", {
+								className: Workbench_module_css_default.empty,
+								children: [
+									(0, react_jsx_runtime.jsx)("span", {
+										className: Workbench_module_css_default.emptyGlyph,
+										"aria-hidden": "true",
+										children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconGaugeOutline16, { size: 22 })
+									}),
+									(0, react_jsx_runtime.jsx)("p", {
+										className: Workbench_module_css_default.emptyTitle,
+										children: t("empty.title")
+									}),
+									(0, react_jsx_runtime.jsx)("p", {
+										className: Workbench_module_css_default.emptyHint,
+										children: t("empty.hint")
+									})
+								]
+							}),
+							workspaces.map((workspace, index) => (0, react_jsx_runtime.jsx)(WorkspaceCard, {
+								workspace,
+								index,
+								t,
+								capability,
+								listDirectory,
+								onOpen: () => {
+									openWorkspace(workspace.workspaceId);
+								},
+								onStart: () => {
+									startSession(workspace.workspaceId);
+								},
+								onRemove: () => {
+									removeWorkspace(workspace.workspaceId);
+								},
+								onOpenFile: (path) => {
+									openCardFile(workspace, path);
+								}
+							}, workspace.workspaceId)),
+							(0, react_jsx_runtime.jsxs)("button", {
+								type: "button",
+								className: Workbench_module_css_default.addCard,
+								"aria-label": t("card.add"),
+								disabled: adding || !canAdd,
+								onClick: onAdd,
+								children: [
+									(0, react_jsx_runtime.jsx)("span", {
+										className: Workbench_module_css_default.addGlyph,
+										"aria-hidden": "true",
+										children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconPlusOutline16, { size: 20 })
+									}),
+									(0, react_jsx_runtime.jsx)("span", {
+										className: Workbench_module_css_default.addTitle,
+										children: t("card.add")
+									}),
+									(0, react_jsx_runtime.jsx)("span", {
+										className: Workbench_module_css_default.addHint,
+										children: t("card.add.hint")
+									})
+								]
+							})
+						]
+					}),
+					(0, react_jsx_runtime.jsx)("footer", {
+						className: Workbench_module_css_default.panelFoot,
+						children: (0, react_jsx_runtime.jsx)("span", {
+							className: Workbench_module_css_default.footHint,
+							children: t("foot.hint")
+						})
+					}),
+					(0, react_jsx_runtime.jsx)(WorkspaceDirectoryPicker, {
+						open: picking,
+						t,
+						browseDirectory,
+						makeDirectory,
+						onPicked,
+						onCancel: () => {
+							setPicking(false);
+						}
+					})
+				]
+			});
+		}
+		/**
+		* The sidebar panel-list glyph: one gauge, no interaction of its own.
+		* @param props - the panel row's presentation share.
+		* @returns the glyph.
+		*/
+		function WorkbenchPanelIcon({ size }) {
+			return (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconGaugeOutline16, { size });
+		}
+		//#endregion
+		//#region dsh-workbench/lib/types/client/WorkbenchFileEditor.js
+		/**
+		* The workbench file editor: one right-column tab that shows a Workspace file
+		* and, on request, writes it back.
+		*
+		* ## Why this is not the official viewer
+		*
+		* The official `text` tab type renders a file read-only on purpose. DSH's client
+		* has no write verb (`remote.workspaceFiles` is read-only and `ctx.fs.writeText`
+		* is a Host service), so an editable surface has to pair the official read
+		* path with a write path this plugin contributes on the Host. That is what this
+		* tab is: `POST /workbench/file/read` loads it, `POST /workbench/file/write`
+		* saves it — atomically, only while the version it loaded is still current, and
+		* under the composition's own sandbox policy.
+		*
+		* ## Shape
+		*
+		* A page tab (no resource pattern), because a page is opened by kind with
+		* params and its address is this package's bookkeeping. Opening another file
+		* navigates the same tab with new params, which is why the body keys its whole
+		* state on `tab.navigation.revision`.
+		*
+		* Reading is deliberate about which side owns what: the text arrives with the
+		* file's version token, edits live only in this tab, and Save is the single
+		* moment anything reaches the disk. A file that changed underneath — an Agent
+		* edit, another program — answers `workbench/stale`, and the editor offers a
+		* reload instead of overwriting it.
+		*/
+		/** The page kind this tab type owns; `openTab` names it. */
+		const EDITOR_KIND = "workbench-editor";
+		/** This implementation's identity in the tab system, and the key its body registers under. */
+		const EDITOR_ID = "dsh-workbench/editor";
+		/** The tab type's registry definition: a page, opened by kind. */
+		function editorDefinition(t) {
+			return {
+				id: EDITOR_ID,
+				kind: EDITOR_KIND,
+				priority: "extension",
+				title: () => t("editor.title")
+			};
+		}
+		/** The trailing path segment, for the tab title. */
+		function baseName(path) {
+			const cut = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+			return cut < 0 ? path : path.slice(cut + 1);
+		}
+		/**
+		* The number of lines one text has, counting a trailing newline as ending the
+		* last line rather than opening an empty one.
+		* @param text - the file's text.
+		* @returns the line count, at least 1.
+		*/
+		function lineCountOf(text) {
+			let lines = 1;
+			for (let index = 0; index < text.length; index += 1) if (text.charCodeAt(index) === 10) lines += 1;
+			return lines;
+		}
+		/** The line-number gutter, one cell per line of the view. */
+		function Gutter({ lines }) {
+			return (0, react_jsx_runtime.jsx)("div", {
+				className: Workbench_module_css_default.editorGutter,
+				"aria-hidden": "true",
+				children: Array.from({ length: lines }, (_, index) => (0, react_jsx_runtime.jsx)("span", {
+					className: Workbench_module_css_default.editorLineNo,
+					children: index + 1
+				}, index))
+			});
+		}
+		/**
+		* Render the editor tab's body.
+		* @param props - the tab runtime share and this plugin's injected face.
+		* @returns the editor element.
+		*/
+		function FileEditorBody({ useTabInfo, wt: t, readFile, writeFile, openPreview }) {
+			const { tab } = useTabInfo();
+			const navigation = tab.navigation;
+			const params = (0, react.useMemo)(() => {
+				const raw = navigation.params;
+				return typeof raw?.sessionId === "string" && typeof raw.path === "string" ? {
+					sessionId: raw.sessionId,
+					path: raw.path
+				} : void 0;
+			}, [navigation.params]);
+			const [load, setLoad] = (0, react.useState)({ state: "loading" });
+			const [draft, setDraft] = (0, react.useState)(void 0);
+			const [saving, setSaving] = (0, react.useState)(false);
+			const [notice, setNotice] = (0, react.useState)(void 0);
+			const [saved, setSaved] = (0, react.useState)(false);
+			const alive = (0, react.useRef)(true);
+			const request = (0, react.useRef)(void 0);
+			(0, react.useEffect)(() => {
+				alive.current = true;
+				return () => {
+					alive.current = false;
+					request.current?.abort();
+				};
+			}, []);
+			/** Load (or reload) the file this tab was navigated to. */
+			const reload = (0, react.useCallback)(() => {
+				if (params === void 0) return;
+				request.current?.abort();
+				const controller = new AbortController();
+				request.current = controller;
+				setLoad({ state: "loading" });
+				setDraft(void 0);
+				setNotice(void 0);
+				setSaved(false);
+				readFile(params.sessionId, params.path).then((outcome) => {
+					if (!alive.current || controller.signal.aborted) return;
+					setLoad(outcome.ok ? {
+						state: "ready",
+						text: outcome.text,
+						version: outcome.version,
+						size: outcome.size
+					} : {
+						state: "failed",
+						code: outcome.code,
+						message: outcome.message
+					});
+				});
+			}, [params, readFile]);
+			(0, react.useEffect)(() => {
+				reload();
+			}, [reload, navigation.revision]);
+			const text = load.state === "ready" ? load.text : "";
+			const value = draft ?? text;
+			const dirty = draft !== void 0 && draft !== text;
+			const lines = (0, react.useMemo)(() => lineCountOf(value), [value]);
+			/** Save the draft, guarded by the version this tab loaded. */
+			const save = (0, react.useCallback)(() => {
+				if (params === void 0 || load.state !== "ready" || draft === void 0) return;
+				setSaving(true);
+				setNotice(void 0);
+				writeFile(params.sessionId, params.path, draft, load.version).then((outcome) => {
+					if (!alive.current) return;
+					setSaving(false);
+					if (outcome.ok) {
+						setLoad({
+							state: "ready",
+							text: draft,
+							version: outcome.version,
+							size: load.size
+						});
+						setDraft(void 0);
+						setSaved(true);
+						return;
+					}
+					setNotice(outcome.code === "workbench/stale" ? t("editor.stale") : `${t("editor.saveFailed")}: ${outcome.message}`);
+				});
+			}, [
+				draft,
+				load,
+				params,
+				t,
+				writeFile
+			]);
+			if (params === void 0) return (0, react_jsx_runtime.jsx)("p", {
+				className: Workbench_module_css_default.editorNote,
+				children: t("editor.noTarget")
+			});
+			const name = baseName(params.path);
+			return (0, react_jsx_runtime.jsxs)("div", {
+				className: Workbench_module_css_default.editor,
+				"data-editor-state": load.state,
+				children: [
+					(0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.editorHead,
+						children: [
+							(0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.editorName,
+								title: params.path,
+								children: name
+							}),
+							dirty && (0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.editorDirty,
+								title: t("editor.dirty"),
+								children: "●"
+							}),
+							(0, react_jsx_runtime.jsxs)("span", {
+								className: Workbench_module_css_default.editorTools,
+								children: [
+									load.state === "ready" && (0, react_jsx_runtime.jsxs)("span", {
+										className: Workbench_module_css_default.editorMeta,
+										children: [
+											lines,
+											" ",
+											t("editor.lines"),
+											" · ",
+											load.size,
+											" B"
+										]
+									}),
+									draft !== void 0 && (0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										className: Workbench_module_css_default.pickerTool,
+										"aria-label": t("editor.discard"),
+										title: t("editor.discard"),
+										onClick: () => {
+											setDraft(void 0);
+											setNotice(void 0);
+										},
+										children: "↺"
+									}),
+									(0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										className: Workbench_module_css_default.pickerTool,
+										"aria-label": t("editor.reload"),
+										title: t("editor.reload"),
+										onClick: reload,
+										children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconRefreshOutline16, { size: 13 })
+									}),
+									(0, react_jsx_runtime.jsx)("button", {
+										type: "button",
+										className: Workbench_module_css_default.pickerTool,
+										"aria-label": t("editor.preview"),
+										title: t("editor.preview"),
+										onClick: () => {
+											openPreview(params.sessionId, params.path);
+										},
+										children: "◱"
+									})
+								]
+							})
+						]
+					}),
+					notice !== void 0 && (0, react_jsx_runtime.jsx)("p", {
+						className: Workbench_module_css_default.editorNotice,
+						role: "alert",
+						children: notice
+					}),
+					load.state === "loading" && (0, react_jsx_runtime.jsxs)("p", {
+						className: Workbench_module_css_default.editorNote,
+						children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconLoadingOutline16, {
+							size: 13,
+							className: Workbench_module_css_default.explorerSpin
+						}), t("editor.loading")]
+					}),
+					load.state === "failed" && (0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.editorNote,
+						children: [(0, react_jsx_runtime.jsx)("p", {
+							className: Workbench_module_css_default.editorFailed,
+							children: load.message
+						}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+							variant: "outline",
+							size: "sm",
+							onClick: () => {
+								openPreview(params.sessionId, params.path);
+							},
+							children: t("editor.preview")
+						})]
+					}),
+					load.state === "ready" && (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.editorBody,
+						children: [(0, react_jsx_runtime.jsx)(Gutter, { lines }), draft === void 0 ? (0, react_jsx_runtime.jsx)("pre", {
+							className: Workbench_module_css_default.editorText,
+							"data-editor-readonly": "",
+							children: value
+						}) : (0, react_jsx_runtime.jsx)("textarea", {
+							className: Workbench_module_css_default.editorInput,
+							value: draft,
+							spellCheck: false,
+							"aria-label": name,
+							onChange: (event) => {
+								setDraft(event.target.value);
+								setSaved(false);
+							},
+							onKeyDown: (event) => {
+								if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+									event.preventDefault();
+									save();
+								}
+							}
+						})]
+					}), (0, react_jsx_runtime.jsxs)("div", {
+						className: Workbench_module_css_default.editorFoot,
+						children: [
+							(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+								variant: draft === void 0 ? "outline" : "ghost",
+								size: "sm",
+								onClick: () => {
+									setDraft(draft === void 0 ? text : void 0);
+									setNotice(void 0);
+									setSaved(false);
+								},
+								children: draft === void 0 ? t("editor.edit") : t("editor.cancel")
+							}),
+							(0, react_jsx_runtime.jsx)("span", {
+								className: Workbench_module_css_default.editorHint,
+								children: saved ? t("editor.saved") : t("editor.hint")
+							}),
+							(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {
+								variant: "primary",
+								size: "sm",
+								disabled: draft === void 0 || saving || !dirty,
+								onClick: save,
+								children: t("editor.save")
+							})
+						]
+					})] })
+				]
+			});
+		}
+		/**
+		* Render the editor tab's chip title: the file's name.
+		* @param props - the tab runtime share and this plugin's injected face.
+		* @returns the title element.
+		*/
+		function FileEditorTitle({ useTabInfo, wt: t }) {
+			const { tab } = useTabInfo();
+			const raw = tab.navigation.params;
+			const name = typeof raw?.path === "string" ? baseName(raw.path) : t("editor.title");
+			return (0, react_jsx_runtime.jsx)("span", {
+				className: Workbench_module_css_default.editorChip,
+				title: name,
+				children: name
+			});
+		}
+		//#endregion
+		//#region dsh-workbench/lib/types/client/locales.js
+		/**
+		* `workbench` namespace dictionaries: the Workspace-card control room.
+		*
+		* The workbench is the Workspace surface's extension, so its copy names
+		* Workspaces rather than projects: a card is a Workspace, and the empty card
+		* slot is how one gets added.
+		*/
+		/** Simplified Chinese dictionary (the key-set source of truth). */
+		const zh = {
+			"trigger": "工作台",
+			"title": "控制室",
+			"subtitle": "工作区工作台 · 每个工作区一张卡片",
+			"live": "运行中",
+			"metrics.label": "工作区读数",
+			"metric.workspaces": "工作区",
+			"metric.workspaces.hint": "已登记",
+			"metric.sessions": "会话",
+			"metric.sessions.hint": "全部工作区合计",
+			"metric.recent": "最近更新",
+			"metric.recent.hint": "本地时间",
+			"metric.clock": "当前时间",
+			"action.add": "添加工作区",
+			"action.refresh": "刷新",
+			"empty.title": "还没有工作区",
+			"empty.hint": "用右侧的加号卡片添加一个工作区目录，它就会变成一张卡片。",
+			"projects.label": "工作区卡片",
+			"card.add": "添加工作区",
+			"card.add.hint": "选择目录并登记为工作区",
+			"card.sessions": "个会话",
+			"card.open": "打开对话",
+			"card.start": "新建会话",
+			"card.view.conversation": "对话",
+			"card.view.files": "文件",
+			"card.updated": "更新于",
+			"card.remove": "移除工作区",
+			"card.remove.hint": "只移除登记，目录与会话日志保留",
+			"card.activate": "打开这个工作区的对话",
+			"file.open": "双击在对话视图右侧打开",
+			"file.noPane": "当前组合没有右侧栏（ui-sidebar-right），文件内容没有地方显示。",
+			"file.noSession": "这个工作区还没有会话，先新建一个会话才能在右侧打开文件。",
+			"editor.title": "工作台编辑器",
+			"editor.loading": "读取中…",
+			"editor.noTarget": "这个标签没有带上要打开的文件。",
+			"editor.lines": "行",
+			"editor.edit": "编辑",
+			"editor.cancel": "退出编辑",
+			"editor.save": "保存",
+			"editor.saved": "已保存",
+			"editor.dirty": "有未保存的改动",
+			"editor.discard": "放弃改动",
+			"editor.reload": "重新读取",
+			"editor.preview": "用官方预览打开（Markdown / 图片 / PDF）",
+			"editor.hint": "Ctrl+S 保存；保存只在你读到的版本仍然是最新时才写入。",
+			"editor.stale": "这个文件在别处被改过，保存已取消：先「重新读取」再改，避免覆盖别人的改动。",
+			"editor.saveFailed": "保存失败",
+			"tree.loading": "读取中…",
+			"tree.empty": "空目录",
+			"tree.truncated": "已截断，只显示前若干项",
+			"tree.retry": "重试",
+			"tree.reload": "重新读取",
+			"tree.collapseAll": "全部折叠",
+			"tree.hint": "点目录行展开或折叠，方向键上下移动；双击文件会在对话视图的右侧打开。",
+			"tree.noSession": "该工作区还没有会话，先新建一个会话才能浏览文件。",
+			"tree.unavailable": "文件能力（workspace-files）还没挂载上，暂时列不出目录。",
+			"tree.error.other": "读不出这个目录。",
+			"tree.error.outside": "该工作区的会话根目录在别处，Host 拒绝列出这个路径。",
+			"tree.error.notFound": "这个目录已经不存在了。",
+			"tree.error.notDirectory": "这个条目不是目录。",
+			"notice.noWorkspaceService": "当前组合没有挂载工作区能力，卡片会是空的；装上工作区（ui-workspace 与 workspace 控制器）后这里会显示工作区。",
+			"notice.addFailed": "添加工作区失败",
+			"notice.openFailed": "打开文件失败",
+			"notice.dismiss": "关闭提示",
+			"picker.title": "添加工作区",
+			"picker.path": "目录地址",
+			"picker.pathPlaceholder": "输入或粘贴目录路径，回车前往",
+			"picker.go": "前往",
+			"picker.up": "上一层",
+			"picker.home": "主目录",
+			"picker.loading": "读取中…",
+			"picker.empty": "这一层没有子目录",
+			"picker.truncated": "目录过多，只显示开头部分",
+			"picker.showHidden": "显示隐藏目录",
+			"picker.newFolder": "新建文件夹",
+			"picker.folderName": "文件夹名称",
+			"picker.untitledFolder": "未命名文件夹",
+			"picker.create": "创建",
+			"picker.choose": "选择此目录",
+			"picker.cancel": "取消",
+			"picker.reload": "重新读取",
+			"picker.unavailable": "当前组合既没有系统目录选择器，也没有目录浏览能力，无法选择目录。",
+			"foot.hint": "卡片来自 Host 工作区注册表，新增/移除与侧边栏工作区同步。"
+		};
+		/** English dictionary, checked complete against the zh key set. */
+		const en = {
+			"trigger": "Workbench",
+			"title": "Control Room",
+			"subtitle": "Workspace workbench · one card per workspace",
+			"live": "Live",
+			"metrics.label": "Workspace readings",
+			"metric.workspaces": "Workspaces",
+			"metric.workspaces.hint": "registered",
+			"metric.sessions": "Sessions",
+			"metric.sessions.hint": "across all workspaces",
+			"metric.recent": "Latest update",
+			"metric.recent.hint": "local time",
+			"metric.clock": "Current time",
+			"action.add": "Add workspace",
+			"action.refresh": "Refresh",
+			"empty.title": "No workspaces yet",
+			"empty.hint": "Use the plus card to add a workspace directory and it becomes a card.",
+			"projects.label": "Workspace cards",
+			"card.add": "Add workspace",
+			"card.add.hint": "Pick a directory and register it",
+			"card.sessions": "sessions",
+			"card.open": "Open conversation",
+			"card.start": "New session",
+			"card.view.conversation": "Conversation",
+			"card.view.files": "Files",
+			"card.updated": "Updated",
+			"card.remove": "Remove workspace",
+			"card.remove.hint": "Unregisters only; directory and session logs stay",
+			"card.activate": "Open this workspace's conversation",
+			"file.open": "Double-click to open in the conversation's right column",
+			"file.noPane": "This composition mounts no right column (ui-sidebar-right), so file content has nowhere to show.",
+			"file.noSession": "This workspace has no session yet; start one to open files on the right.",
+			"editor.title": "Workbench editor",
+			"editor.loading": "Reading…",
+			"editor.noTarget": "This tab carries no file to open.",
+			"editor.lines": "lines",
+			"editor.edit": "Edit",
+			"editor.cancel": "Stop editing",
+			"editor.save": "Save",
+			"editor.saved": "Saved",
+			"editor.dirty": "Unsaved changes",
+			"editor.discard": "Discard changes",
+			"editor.reload": "Reload",
+			"editor.preview": "Open in the official viewer (Markdown / images / PDF)",
+			"editor.hint": "Ctrl+S saves; the write happens only while the version you loaded is still current.",
+			"editor.stale": "This file changed elsewhere, so the save was cancelled: reload first and reapply your edit instead of overwriting it.",
+			"editor.saveFailed": "Save failed",
+			"tree.loading": "Reading…",
+			"tree.empty": "Empty directory",
+			"tree.truncated": "Truncated to the entry cap",
+			"tree.retry": "Retry",
+			"tree.reload": "Reload",
+			"tree.collapseAll": "Collapse all",
+			"tree.hint": "Click a directory row to expand or collapse it, arrow keys to move; double-click a file to open it in the conversation's right column.",
+			"tree.noSession": "This workspace has no session yet; start one to browse its files.",
+			"tree.unavailable": "The file capability (workspace-files) is not mounted yet, so directories cannot be listed.",
+			"tree.error.other": "That directory could not be read.",
+			"tree.error.outside": "That Workspace session is rooted elsewhere, so the Host refused this path.",
+			"tree.error.notFound": "That directory no longer exists.",
+			"tree.error.notDirectory": "That entry is not a directory.",
+			"notice.noWorkspaceService": "This composition mounts no Workspace capability, so the grid stays empty; mounting ui-workspace and the workspace controller fills it.",
+			"notice.addFailed": "Could not add the workspace",
+			"notice.openFailed": "Could not open the file",
+			"notice.dismiss": "Dismiss",
+			"picker.title": "Add workspace",
+			"picker.path": "Directory address",
+			"picker.pathPlaceholder": "Type or paste a directory path, then Enter",
+			"picker.go": "Go",
+			"picker.up": "Parent directory",
+			"picker.home": "Home",
+			"picker.loading": "Reading…",
+			"picker.empty": "No subdirectories here",
+			"picker.truncated": "Too many directories to list; only the beginning is shown",
+			"picker.showHidden": "Show hidden directories",
+			"picker.newFolder": "New folder",
+			"picker.folderName": "Folder name",
+			"picker.untitledFolder": "Untitled folder",
+			"picker.create": "Create",
+			"picker.choose": "Choose this directory",
+			"picker.cancel": "Cancel",
+			"picker.reload": "Reload",
+			"picker.unavailable": "This composition mounts neither an OS directory chooser nor directory browsing, so no directory can be chosen.",
+			"foot.hint": "Cards come from the Host Workspace registry, so add/remove stays in sync with the sidebar."
+		};
+		//#endregion
+		//#region dsh-workbench/lib/types/client/index.js
+		/** Dictionary namespace owned by this plugin. */
+		const NS = "workbench";
+		/** The `main` key this plugin occupies (also the panel-list row id). */
+		const PANEL_ID = "workbench";
+		/**
+		* Required services.
+		*
+		* Deliberately minimal: the slot registry and the locale service are the only
+		* ones the workbench cannot exist without.
+		*/
+		const inject = ["slots", "locale"];
+		/** The two routes this plugin's Host half contributes. */
+		const WORKBENCH_READ_ROUTE = "/workbench/file/read";
+		const WORKBENCH_WRITE_ROUTE = "/workbench/file/write";
+		/**
+		* The optional services as the root registry answers right now.
+		*
+		* Read per call rather than captured: every one of them can be mounted after
+		* this plugin's `apply`, and two of them are Remote namespaces that mount
+		* asynchronously.
+		* @param ctx - the client root context.
+		* @param name - service name to resolve.
+		* @returns the service, or undefined when this composition has not mounted it.
+		*/
+		function service(ctx, name) {
+			return ctx.get(name);
+		}
+		/**
+		* The `workspaceFiles` namespace, through whichever face carries it: the traced
+		* `remote.<namespace>` child service, or the Remote assembly object.
+		* @param ctx - the client root context.
+		* @returns the namespace, or undefined when unmounted.
+		*/
+		function workspaceFiles(ctx) {
+			const traced = service(ctx, "remote.workspaceFiles");
+			if (traced !== void 0) return traced;
+			return service(ctx, "remote")?.workspaceFiles;
+		}
+		/**
+		* The `directoryPicker` namespace, resolved the same two ways as
+		* {@link workspaceFiles}.
+		* @param ctx - the client root context.
+		* @returns the namespace, or undefined when unmounted.
+		*/
+		function directoryPicker(ctx) {
+			const traced = service(ctx, "remote.directoryPicker");
+			if (traced !== void 0) return traced;
+			return service(ctx, "remote")?.directoryPicker;
+		}
+		/** One line for a rejection that crossed a service boundary. */
+		function messageOf(error) {
+			return error instanceof Error ? error.message : String(error);
+		}
+		/**
+		* Classify one right-column rejection.
+		*
+		* `ui-sidebar-right` raises plain `Error`s, so the only signal is their text.
+		* Of the two a file open can hit, the missing seat is the one a caller can
+		* repair — put a session on screen — so it travels as a code instead of as a
+		* line the reader cannot act on.
+		* @param error - the rejection.
+		* @returns the classification, empty when there is none.
+		*/
+		function paneCodeOf(error) {
+			return messageOf(error).includes("no session surface is mounted") ? { code: "pane/no-session" } : {};
+		}
+		/**
+		* Register the workbench's dictionaries, its sidebar panel row, and its main
+		* panel body.
+		* @param ctx - the client root context.
+		*/
+		function apply(ctx) {
+			ctx.effect(() => ctx.locale.register(NS, {
+				zh,
+				en
+			}), "dsh-workbench: dictionaries");
+			const workbenchT = ctx.locale.bind(NS);
+			const capability = createCapabilityStore();
+			const seed = {
+				navigation: service(ctx, "uiWorkspace") !== void 0,
+				workspaces: service(ctx, "workspaces") !== void 0,
+				files: workspaceFiles(ctx) !== void 0,
+				picker: directoryPicker(ctx) !== void 0,
+				pane: service(ctx, "sidebarRight") !== void 0
+			};
+			capability.set(seed);
+			/**
+			* Report one optional service's presence for as long as it is mounted.
+			* @param name - the service to watch.
+			* @param on - the capability patch while it is mounted.
+			* @param off - the capability patch once it unmounts.
+			*/
+			const watch = (name, on, off) => {
+				ctx.inject([name], (scope) => {
+					scope.effect(() => {
+						capability.set(on);
+						return () => {
+							capability.set(off);
+						};
+					}, `dsh-workbench: ${name} capability`);
+				});
+			};
+			watch("uiWorkspace", { navigation: true }, { navigation: false });
+			watch("workspaces", { workspaces: true }, { workspaces: false });
+			watch("remote.workspaceFiles", { files: true }, { files: false });
+			watch("remote.directoryPicker", { picker: true }, { picker: false });
+			watch("sidebarRight", { pane: true }, { pane: false });
+			/**
+			* Register one absolute directory as a Workspace.
+			*
+			* The single adoption step: both adding routes (the OS chooser and the in-app
+			* picker) end here, so a failure is reported once, in one place.
+			* @param path - absolute host directory the operator picked.
+			* @returns what the panel should show about it.
+			*/
+			const registerWorkspace = async (path) => {
+				const registry = service(ctx, "workspaces");
+				if (registry === void 0) return {
+					kind: "failed",
+					message: workbenchT("notice.noWorkspaceService")
+				};
+				try {
+					await registry.create({ path });
+					return {
+						kind: "created",
+						path
+					};
+				} catch (error) {
+					return {
+						kind: "failed",
+						message: messageOf(error)
+					};
+				}
+			};
+			/**
+			* Try the Host's OS chooser, and say what the panel should do when it cannot
+			* serve one. See {@link pickStep} for why a refusal means "browse in-app".
+			* @returns what the panel should show, or `browse` to open the in-app picker.
+			*/
+			const pickWorkspace = async () => {
+				if (service(ctx, "workspaces") === void 0) return {
+					kind: "failed",
+					message: workbenchT("notice.noWorkspaceService")
+				};
+				const picker = directoryPicker(ctx);
+				if (picker === void 0) return { kind: "browse" };
+				let reply;
+				try {
+					reply = await picker.pick();
+				} catch (error) {
+					return {
+						kind: "failed",
+						message: messageOf(error)
+					};
+				}
+				const step = pickStep(reply);
+				switch (step.step) {
+					case "picked": return registerWorkspace(step.path);
+					case "cancelled": return { kind: "cancelled" };
+					case "browse": return { kind: "browse" };
+					default: return {
+						kind: "failed",
+						message: step.message
+					};
+				}
+			};
+			/**
+			* List one level for the in-app picker.
+			* @param path - directory to list; absent lists the host account's home.
+			* @param signal - cancellation for a superseded scan.
+			* @returns the level, or the line to show instead.
+			*/
+			const browseDirectory = async (path, signal) => {
+				const navigation = service(ctx, "uiWorkspace");
+				if (navigation === void 0) return {
+					ok: false,
+					message: workbenchT("picker.unavailable")
+				};
+				try {
+					return {
+						ok: true,
+						value: await navigation.listDirectory(path, signal)
+					};
+				} catch (error) {
+					return {
+						ok: false,
+						message: messageOf(error)
+					};
+				}
+			};
+			/**
+			* Create one child directory for the in-app picker.
+			* @param path - existing parent directory.
+			* @param name - single non-blank path segment.
+			* @returns the created path, or the line to show instead.
+			*/
+			const makeDirectory = async (path, name) => {
+				const navigation = service(ctx, "uiWorkspace");
+				if (navigation === void 0) return {
+					ok: false,
+					message: workbenchT("picker.unavailable")
+				};
+				try {
+					return {
+						ok: true,
+						path: await navigation.createDirectory(path, name)
+					};
+				} catch (error) {
+					return {
+						ok: false,
+						message: messageOf(error)
+					};
+				}
+			};
+			const openWorkspace = (workspaceId) => {
+				const navigation = service(ctx, "uiWorkspace");
+				if (navigation === void 0) return;
+				navigation.openWorkspace(workspaceId);
+			};
+			const startSession = (workspaceId) => {
+				service(ctx, "uiWorkspace")?.startSession(workspaceId);
+			};
+			const removeWorkspace = (workspaceId) => {
+				const registry = service(ctx, "workspaces");
+				if (registry === void 0) return;
+				registry.delete(workspaceId);
+			};
+			const listDirectory = async (sessionId, path, signal) => {
+				const files = workspaceFiles(ctx);
+				if (files === void 0) return {
+					ok: false,
+					value: {
+						status: "error",
+						entries: [],
+						truncated: false,
+						error: workbenchT("tree.unavailable")
+					}
+				};
+				const result = await files.list(sessionId, path, signal);
+				if (result.ok) return {
+					ok: true,
+					value: {
+						status: "ready",
+						entries: result.value.entries,
+						truncated: result.value.truncated
+					}
+				};
+				return {
+					ok: false,
+					value: {
+						status: "error",
+						entries: [],
+						truncated: false,
+						error: failureText(workbenchT, result.error)
+					}
+				};
+			};
+			/**
+			* Show one file in the right column: the workbench editor when the right
+			* column is there, the official viewer as the fallback route.
+			*
+			* The address carries the Session, not the sandbox: the official `text` tab
+			* type claims session-scoped file addresses only, and the Host resolves the
+			* path against that Session's workspace root.
+			* @param sessionId - the Session whose workspace holds the file.
+			* @param path - the file's absolute path.
+			* @returns whether the column took it, and why not when it did not.
+			*/
+			const openFile = (sessionId, path) => {
+				const pane = service(ctx, "sidebarRight");
+				if (pane === void 0) return {
+					ok: false,
+					message: workbenchT("file.noPane")
+				};
+				if (pane.openTab !== void 0) try {
+					pane.openTab(EDITOR_KIND, { params: {
+						sessionId,
+						path
+					} });
+					return { ok: true };
+				} catch (error) {
+					if (!(error instanceof Error)) return {
+						ok: false,
+						message: messageOf(error)
+					};
+				}
+				return openPreview(sessionId, path);
+			};
+			/**
+			* Put one Session on screen.
+			*
+			* Selecting a session is only half of what the right column needs: its root
+			* controller renders the session-scoped seat **only while the Conversation is
+			* the selected main panel** (`ui-sidebar-right`'s `RightbarRoot`), and that
+			* seat is what publishes the binding every `openResource`/`openTab` requires.
+			* @param sessionId - the Session to make current.
+			* @returns whether a sessions service was there to answer.
+			*/
+			const selectSession = (sessionId) => {
+				const sessions = service(ctx, "sessions");
+				if (sessions === void 0) return false;
+				sessions.open(sessionId);
+				return true;
+			};
+			/**
+			* Select the Conversation as the center column's panel (`activePanelId: null`).
+			*
+			* This is the step that brings the right column into existence at all: the
+			* workbench is a global panel, and a global panel means no right column, so
+			* any file open has to hand the column over first. It is the same selection
+			* `uiWorkspace.openSession` makes, taken here on its own so the handover does
+			* not also reconnect a workspace.
+			* @returns whether a layout service was there to answer.
+			*/
+			const showConversation = () => {
+				const layout = service(ctx, "layout");
+				if (layout === void 0) return false;
+				layout.selectPanel(null);
+				return true;
+			};
+			/**
+			* Show one file in the official viewer instead of the editor: the route that
+			* renders Markdown, PDFs, and images rather than their bytes.
+			* @param sessionId - the Session whose workspace holds the file.
+			* @param path - the file's absolute path.
+			* @returns whether the column took it, and why not when it did not.
+			*/
+			const openPreview = (sessionId, path) => {
+				const pane = service(ctx, "sidebarRight");
+				if (pane === void 0) return {
+					ok: false,
+					message: workbenchT("file.noPane")
+				};
+				try {
+					pane.openResource(fileAddress(sessionId, path));
+					return { ok: true };
+				} catch (error) {
+					return {
+						ok: false,
+						message: messageOf(error),
+						...paneCodeOf(error)
+					};
+				}
+			};
+			/**
+			* Load one file's text through this plugin's Host route.
+			*
+			* The route exists because the client has no write verb and no bounded text
+			* read with a version token; it answers the same shape whether it failed in
+			* the trust fence, the boundary check, or the filesystem.
+			* @param sessionId - the Session whose workspace confines the path.
+			* @param path - the file's absolute path.
+			* @returns the text and its version, or the reason it could not be read.
+			*/
+			const readFile = async (sessionId, path) => {
+				try {
+					const response = await fetch(WORKBENCH_READ_ROUTE, {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({
+							sessionId,
+							path
+						})
+					});
+					const payload = await response.json();
+					if (payload.ok === true && typeof payload.text === "string" && typeof payload.version === "string") return {
+						ok: true,
+						text: payload.text,
+						version: payload.version,
+						size: payload.size ?? 0
+					};
+					return {
+						ok: false,
+						code: payload.code ?? "workbench/failed",
+						message: payload.message ?? `HTTP ${response.status}`
+					};
+				} catch (error) {
+					return {
+						ok: false,
+						code: "workbench/unreachable",
+						message: messageOf(error)
+					};
+				}
+			};
+			/**
+			* Save one file through this plugin's Host route.
+			* @param sessionId - the Session whose workspace confines the path.
+			* @param path - the file's absolute path.
+			* @param text - the full new content.
+			* @param version - the version the reader loaded; a mismatch is refused.
+			* @returns the new version, or the reason the write did not happen.
+			*/
+			const writeFile = async (sessionId, path, text, version) => {
+				try {
+					const response = await fetch(WORKBENCH_WRITE_ROUTE, {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({
+							sessionId,
+							path,
+							text,
+							version
+						})
+					});
+					const payload = await response.json();
+					if (payload.ok === true && typeof payload.version === "string") return {
+						ok: true,
+						version: payload.version
+					};
+					return {
+						ok: false,
+						code: payload.code ?? "workbench/failed",
+						message: payload.message ?? `HTTP ${response.status}`
+					};
+				} catch (error) {
+					return {
+						ok: false,
+						code: "workbench/unreachable",
+						message: messageOf(error)
+					};
+				}
+			};
+			const injected = () => ({
+				wt: workbenchT,
+				hooks: { capability },
+				pickWorkspace,
+				registerWorkspace,
+				browseDirectory,
+				makeDirectory,
+				openFile,
+				selectSession,
+				showConversation,
+				openWorkspace,
+				startSession,
+				removeWorkspace,
+				listDirectory
+			});
+			const editorInjected = () => ({
+				wt: workbenchT,
+				readFile,
+				writeFile,
+				openPreview
+			});
+			ctx.slots.inject("main", () => ctx.slots.register({
+				name: "main",
+				key: PANEL_ID,
+				inject: injected
+			}, WorkbenchPanel));
+			ctx.inject(["sidebarRightTabs"], (scope) => {
+				scope.effect(() => scope.sidebarRightTabs.register(editorDefinition(workbenchT)), "dsh-workbench: editor tab type");
+			});
+			ctx.slots.inject("sidebar.right.pane.tab", () => ctx.slots.register({
+				name: "sidebar.right.pane.tab",
+				key: EDITOR_ID,
+				locale: NS,
+				inject: editorInjected
+			}, FileEditorBody));
+			ctx.slots.inject("sidebar.right.pane.tab.title", () => ctx.slots.register({
+				name: "sidebar.right.pane.tab.title",
+				key: EDITOR_ID,
+				inject: editorInjected
+			}, FileEditorTitle));
+			ctx.slots.inject("sidebar.panellist", () => ctx.slots.register({
+				name: "sidebar.panellist",
+				id: PANEL_ID,
+				order: 20,
+				label: () => workbenchT("trigger")
+			}, WorkbenchPanelIcon));
+		}
+		//#endregion
+		exports.CARD_ACCENTS = CARD_ACCENTS;
+		exports.EDITOR_ID = EDITOR_ID;
+		exports.EDITOR_KIND = EDITOR_KIND;
+		exports.FileEditorBody = FileEditorBody;
+		exports.FileEditorTitle = FileEditorTitle;
+		exports.MAX_EXPLORER_DEPTH = MAX_EXPLORER_DEPTH;
+		exports.NO_CAPABILITIES = NO_CAPABILITIES;
+		exports.WorkbenchPanel = WorkbenchPanel;
+		exports.WorkbenchPanelIcon = WorkbenchPanelIcon;
+		exports.accentFor = accentFor;
+		exports.apply = apply;
+		exports.childPath = childPath;
+		exports.createCapabilityStore = createCapabilityStore;
+		exports.editorDefinition = editorDefinition;
+		exports.explorerRows = explorerRows;
+		exports.failureText = failureText;
+		exports.fileAddress = fileAddress;
+		exports.inject = inject;
+		exports.orderEntries = orderEntries;
+		exports.parentPathOf = parentPathOf;
+		exports.pickStep = pickStep;
+		exports.pickerCrumbs = pickerCrumbs;
+		exports.pickerEntries = pickerEntries;
+		exports.sizeText = sizeText;
+		exports.splitPath = splitPath;
+		exports.workspaceItems = workspaceItems;
+		return module.exports;
+	}
+});
+
+//# sourceMappingURL=client.js.map

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DSH 可视化工作台 · 预览</title>
+<style>
+  /* Host page: a subset of ui-theme's design platform, so the trigger renders in
+     the same token context it ships in. */
+  :root {
+    --dsw-static-neutral-bluish-00: rgb(255, 255, 255);
+    --dsw-static-neutral-bluish-50: rgb(249, 250, 251);
+    --dsw-static-neutral-bluish-75: rgb(241, 243, 245);
+    --dsw-static-neutral-bluish-150: rgb(233, 236, 242);
+    --dsw-static-neutral-bluish-300: rgb(207, 211, 214);
+    --dsw-static-neutral-bluish-400: rgb(173, 178, 184);
+    --dsw-static-neutral-bluish-600: rgb(129, 133, 140);
+    --dsw-static-neutral-bluish-700: rgb(97, 102, 107);
+    --dsw-static-neutral-bluish-1000: rgb(15, 17, 21);
+    --dsw-static-blue-400: rgb(96, 165, 250);
+    --dsw-static-deepseek-500: rgb(65, 118, 230);
+    --dsw-alias-bg-module-platform: var(--dsw-static-neutral-bluish-50);
+    --dsw-alias-border-l3: rgba(0, 0, 0, 0.12);
+    --dsw-alias-border-l4: rgba(0, 0, 0, 0.16);
+    --dsw-alias-interactive-bg-hover: rgba(38, 49, 72, 0.06);
+    --dsw-alias-interactive-bg-active: rgba(38, 49, 72, 0.1);
+    --dsw-alias-label-primary: var(--dsw-static-neutral-bluish-1000);
+    --dsw-alias-label-secondary: var(--dsw-static-neutral-bluish-700);
+    --dsw-alias-label-caption: var(--dsw-static-neutral-bluish-400);
+    --dsw-alias-link: var(--dsw-static-deepseek-500);
+    --ds-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --ds-font-family-code: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+    --dsw-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+      'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; padding: 40px 32px 72px;
+    background: linear-gradient(180deg, #f8fafd, #eef1f7 55%, #e8ecf3);
+    color: var(--dsw-alias-label-primary);
+    font-family: var(--dsw-font-family); font-size: 14px;
+  }
+
+  .pageHead { max-width: 1180px; margin: 0 auto 24px; }
+  .pageTitle { margin: 0; font-size: 22px; font-weight: 600; }
+  .pageSub { margin: 8px 0 0; color: var(--dsw-static-neutral-bluish-600); font-size: 13px; line-height: 1.6; }
+  .pageHint {
+    margin: 14px 0 0; padding: 10px 14px; border-radius: 10px; font-size: 12.5px; line-height: 1.6;
+    border: 1px solid rgba(65, 118, 230, 0.22); background: rgba(65, 118, 230, 0.06);
+    color: var(--dsw-static-neutral-bluish-700);
+  }
+
+  .frames { max-width: 1180px; margin: 0 auto; display: grid; gap: 22px; }
+  .frame {
+    border: 1px solid rgba(15, 17, 21, 0.08); border-radius: 16px; overflow: hidden;
+    background: #fff; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  }
+  .frameHead { padding: 14px 18px 12px; border-bottom: 1px solid rgba(15, 17, 21, 0.06); }
+  .frameTitle { margin: 0; font-size: 14px; font-weight: 600; }
+  .frameCaption { margin: 4px 0 0; font-size: 12px; color: var(--dsw-static-neutral-bluish-600); }
+  .frameBody { padding: 18px; background: var(--dsw-alias-bg-module-platform); }
+
+  .sidebar {
+    display: flex; flex-direction: column; gap: 10px; background: #fff;
+    border: 1px solid rgba(15, 17, 21, 0.08); border-radius: 12px; padding: 12px;
+  }
+  .sidebar.narrow { width: 76px; align-items: center; }
+  .sidebar.wide { width: 280px; }
+  .rail { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .railBrand {
+    width: 24px; height: 24px; border-radius: 8px;
+    background: linear-gradient(140deg, var(--dsw-static-blue-400), var(--dsw-static-deepseek-500));
+  }
+  .railPill, .railFoot {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--dsw-alias-interactive-bg-hover); font-size: 11px;
+  }
+  .mockList { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+  .mockList span { display: block; height: 30px; border-radius: 8px; background: var(--dsw-alias-interactive-bg-hover); }
+  .mockSettings {
+    display: flex; align-items: center; height: 36px; padding: 0 8px; border-radius: 10px;
+    color: var(--dsw-alias-label-secondary); font-size: 13px;
+  }
+  #status { max-width: 1180px; margin: 0 auto 18px; font-size: 12.5px; color: var(--dsw-static-neutral-bluish-600); }
+</style>
+<!-- The bundle's own stylesheet, extracted from the shipping artifact. -->
+<link rel="stylesheet" href="./workbench.css" />
+<!-- Browser-side CommonJS loader for the React files (React 18 has no ESM build). -->
+<script type="module" src="/__cjs/loader.js?v=3"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "/__vendor/react",
+    "react/jsx-runtime": "/__vendor/jsx-runtime",
+    "react-dom": "/__vendor/react-dom-client",
+    "react-dom/client": "/__vendor/react-dom-client",
+    "@deepseek-ai/dsh-client-store": "/__vendor/client-store",
+    "@deepseek-ai/dsh-client-ui-slots": "/__vendor/ui-slots",
+    "@deepseek-ai/dsh-client-ui-primitives": "/__vendor/ui-primitives"
+  }
+}
+</script>
+</head>
+<body>
+  <header class="pageHead">
+    <h1 class="pageTitle">可视化工作台 · 控制室</h1>
+    <p class="pageSub">
+      侧边栏底部的入口，以及它打开的控制室与用户自定义项目卡片。
+      此页加载的正是插件构建产物 <code>lib/client.js</code> 里导出的同一个组件。
+    </p>
+    <p class="pageHint">
+      第三块面板已自动打开控制室并带 3 张示例卡片：可直接修改名称、目录、进度、状态与配色，
+      数据写入浏览器 localStorage。按 Esc 或点背景关闭。
+    </p>
+  </header>
+  <p id="status">正在加载插件产物…</p>
+  <main class="frames" id="root"></main>
+  <script type="module" src="./main.js?v=3"></script>
+</body>
+</html>

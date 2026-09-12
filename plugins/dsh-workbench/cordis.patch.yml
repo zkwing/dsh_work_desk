@@ -1,0 +1,15 @@
+# dsh-workbench: the profile-layer patch this bundle contributes.
+#
+# A bundle's patch is applied after the layers listed before it in the active
+# profile's `dsh.profile.bundles`, and before the profile's own
+# `cordis.patch.yml`. This one only registers the plugin's Host row: the row
+# makes the package a live Loader entry, which is what lets the client module
+# system discover its `dsh.client` declaration and serve
+# `/plugins/dsh-workbench/client.js` to the browser.
+#
+# No other plugin's row is targeted, overridden, or disabled — the workbench
+# composes through the official `sidebar.footer.action` slot at runtime and
+# needs no patch of the sidebar it occupies.
+- insert:
+    - id: workbench
+      name: dsh-workbench

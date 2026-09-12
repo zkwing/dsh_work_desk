@@ -1,0 +1,62 @@
+{
+  "name": "dsh-workbench",
+  "version": "0.1.0",
+  "description": "Visual workbench for DeepSeek Harness: a sidebar-foot control room with user-defined project cards. Works in ordinary dsh web and in DSH Desktop.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "lib/client.js.map",
+    "lib/types/**/*.d.ts",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "workbench",
+    "control-room"
+  ],
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ],
+      "external": []
+    }
+  },
+  "engines": {
+    "dsh": ">=0.1.5-rc.1"
+  },
+  "scripts": {
+    "build": "powershell -ExecutionPolicy Bypass -File build-plugin.ps1",
+    "verify": "node scripts/verify-artifact.mjs",
+    "install:web": "dsh plugin --profile web add .",
+    "install:desktop": "dsh plugin --profile desktop add ."
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "*"
+  }
+}
