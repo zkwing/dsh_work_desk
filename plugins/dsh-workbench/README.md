@@ -45,23 +45,73 @@ bind host / SSH / 显示会话解析一次，Desktop 那次解析落在 browse�
 
 ## 视觉与主题
 
-面板**跟随 DSH 主题**：底色、卡片、文字、边框、强调色、状态色全部取自宿主别名 token
-（`--dsw-alias-bg-base` / `-bg-layer-1|2` / `-bg-overlay` / `-border-l1|l2` / `-label-primary|secondary` /
-`-brand-primary` / `-state-*-primary`），token 统一声明在 `:root`（这样 portaled 的选择器对话框也继承到），
+面板**整体跟随 DSH 主题**：底色、卡片层、文字、边框、强调色、状态色、背景网格 —
+**没有一处是字面色**。所有可见颜色都派生自宿主别名 token（`--dsw-alias-bg-base` /
+`-bg-layer-1|2` / `-bg-overlay` / `-border-l1|l2` / `-label-primary|secondary` /
+`-brand-primary` / `-state-*-primary`）；少数 `var(…, 颜色字面量)` 的写法只在
+**宿主完全不提供主题 token** 时作为最后一道兜底生效，正常环境下永远走 alias。
+token 统一声明在 `:root`（这样 portaled 的选择器对话框也继承到），
 所以浅色、深色、以及注册进来的第三方主题都对。面板自己**不再**声明 `color-scheme`
 ——那是布局的 theme presenter 在 `html` 上的职责。
 
+**六张卡片强调色**也是 token 派生而非字面色（顺序：azure / violet / amber / emerald / rose / slate，
+`accentFor(index)` 按 6 循环，保证相邻卡片颜色不同）：
+
+| 位置 | 派生方式 | 取自 |
+| --- | --- | --- |
+| azure | `oklch(from --dsw-alias-brand-primary l 0.16 240)` | brand-primary 的 l + 钉住的 C + 固定 hue 240° |
+| violet | `oklch(from --dsw-alias-brand-primary l 0.16 290)` | brand-primary 的 l + 钉住的 C + 固定 hue 290° |
+| amber | 直接消费 | `--dsw-alias-state-warn-primary` |
+| emerald | 直接消费 | `--dsw-alias-state-success-primary` |
+| rose | 直接消费 | `--dsw-alias-state-error-primary` |
+| slate | 直接消费 | `--dsw-alias-label-secondary` |
+
+azure / violet 之所以 `oklch(from …)` 而不是直接消费 brand-primary，是因为 brand-primary 本身
+是近无彩色（chroma ≈ 0.006 light / 0.003 dark），只取它的 l（明度随主题走）、把 C 钉在 0.16
+保持原蓝/紫饱和度、色相写死 240°/290° — 这样浅色下是深蓝/深紫、深色下是淡蓝/淡紫，
+两两相邻在两种配色下都可辨，也与 slate 的中性灰明显区分。
+
+**背景网格**由 `::before` 一层四条渐变画成：**16px 细格 + 80px 粗格**（比早先的 32px 密），
+网格颜色**由 alias token 派生**而不是写死的字面色：深色配色下取 `--dsw-alias-label-primary`
+的低 alpha 混合（暗色下该 token 近白，混出来是冷色低对比网格），浅色配色下取
+`--dsw-alias-state-warn-primary`（即 amber，浅色下是金色"工程图"底纹），
+所以一个第三方主题只要重调这两个 alias，整面网格就跟着换色，不用本插件再写一条规则。
+
+**浅色配色下每个模块单独"浮"起来**：宿主浅色的 `bg-base` / `bg-layer-1` / `bg-overlay`
+本身都是近白，模块若直接取这几个 alias 就会糊成一片。所以浅色分支额外声明了一组
+**模块材质 token**（画布 `--wb-bg` 染成带墨的纸、顶部 `--wb-ambient-halo` 改白光、
+`--wb-glass-edge` 换成更利落的发丝边、`--wb-rim-top` 取略浅的顶边、
+`--wb-card-base` / `--wb-card-rim` / `--wb-card-shadow` 三件套），再由一段
+`:root[data-wb-scheme='light']` 作用域规则给各模块各自的材质：
+
+| 模块 | 浅色下的材质 |
+| --- | --- |
+| 顶栏 `.panelHead` | 白底 + 底部发丝线 + 一层薄投影，卡片网格从它**后面**滚过 |
+| 顶栏徽标 `.headGlyph` | 实心墨色"拱心石"+ 纸色字形（浅色 brand 本身近黑，实心比低 alpha 洗色更像有意为之） |
+| 读数条 `.readings` / `.reading` | 墨色浅托盘，四条读数各站一张**白色仪表砖**（发丝边 + 两层接触阴影 + 顶沿 2px 强调色导轨） |
+| 卡片 `.card` | 近白**纸面**（`--wb-card-base` 94% 白）+ 顶部一层强调色淡染；深色那套四层玻璃在浅色下收敛成两层 |
+| 资源管理器 `.explorer` | 在卡片里**凹进去的井**：自己的边 + 内阴影 |
+| 底栏 `.panelFoot` | 比读数托盘更淡的横条，形成 顶栏 → 托盘 → 卡片区 → 底座 的层次 |
+| 空位 / 空态 `.addCard` / `.empty` | 半透明白 + 实发丝边 + 与卡片同款接触阴影，空网格也读成"布局"而不是"洞" |
+
+**深色分支一个字节都没动**：所有会跟卡片状态打架的属性（`border-color` / `box-shadow`）
+走的是上面那组 token，浅色只换 token 的值，所以卡片的 hover / focus / running / completed
+四种状态在两种配色下都仍然成立，不需要在浅色分支里重抄一遍。
+
 卡片是**液晶玻璃**：半透明层 + `backdrop-filter: blur(22px) saturate(180%)`，
 亮边（`border-top-color` 提亮）、内侧高光与下沉阴影，加一道斜向镜面高光，
-hover 时高光缓慢扫过并轻微上浮。玻璃的色调从 `--wb-glass-tint`（= 当前文字色）混合而来，
-所以一套配方在两种配色下都成立：浅色下是深色墨染玻璃，深色下是浅色雾面玻璃。
+hover 时高光缓慢扫过并轻微上浮（浅色分支把模糊收敛到 `blur(18px) saturate(150%)`，
+因为浅色卡片背后本来就没有多少颜色可糊）。深色下玻璃的色调从 `--wb-glass-tint`
+（= 当前文字色）混合而来，一套配方成立；浅色下则由 `--wb-card-base` 换成近白纸面。
+全部新增的 hover / focus / sheen 动画都在 `@media (prefers-reduced-motion: reduce)` 内被设为
+`transition: none` + `--wb-sheen-angle: 0deg`，动画一律关掉。
 
-背景网格由 `::before` 一层四条渐变画成：**16px 细格 + 80px 粗格**（比早先的 32px 密），
-按配色换色——**深色背景用白色**（`#ffffff0e` / `#ffffff1c`），
-**浅色背景用金色**（`#b0801824` / `#b080184d`，即 `rgb(176,128,24)`）。
-换色的判据来自 `ctx.theme` 的 `active.colorScheme`，通过注册的 `hooks.scheme`
-绑定成 `useScheme` 选择器 hook，面板根上落 `data-wb-scheme`，样式表据此切换；
-`theme/change` 事件会实时翻转它。
+外观/主题变更的**自动传播路径**：`ctx.theme` 的 `active.colorScheme` 通过注册的 `hooks.scheme`
+绑定成 `useScheme` 选择器 hook，面板根上落 `data-wb-scheme="light|dark"`，样式表据此切换；
+`theme/change` 事件由 `ctx.on('theme/change', …)` 订阅，每一次主题翻转都会即时更新
+`data-wb-scheme` — 也就是说 DSH Desktop 上点切换主题、注册第三方主题、或调整任何 alias token，
+工作台界面的所有 token 派生色（含背景网格和六张卡片强调色）都会在同一帧内跟随变化，
+不需要本插件做任何额外注册。
 
 ## 四条硬约束
 

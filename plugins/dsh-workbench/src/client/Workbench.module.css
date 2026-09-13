@@ -10,6 +10,115 @@
  * strip, the scrollable Workspace-card grid, and the foot. The `::before` layer
  * is the engineering grid behind that content, and the cards above it are
  * frosted glass, so the grid reads through them.
+ *
+ * --------------------------------------------------------------------------
+ * DSH alias-token manifest (the host variables this stylesheet actually reads)
+ * --------------------------------------------------------------------------
+ * Sources of truth (read-only — both checked against
+ * `packages/client/ui-theme/src/styles/design-platform.css`):
+ *   • Light palette : `body`                  (lines ~157–246 of design-platform.css)
+ *   • Dark  palette : `body[data-ds-dark-theme]` (lines ~249–340 of design-platform.css)
+ *
+ * Theme override surface (set on `<body>` by the host theme runtime when a
+ * theme, override layer, or registered third-party theme flips a token):
+ *   • Both palettes share the same alias names — the override is a value swap,
+ *     not a name swap, so the references below stay valid for every theme.
+ *   • No `--dsw-alias-*` token is declared in this file. Every alias used
+ *     below is declared by the host; this stylesheet only consumes them.
+ *
+ * Token → role map (each `--dsw-alias-*` referenced in this file, what it
+ * means, and what `--wb-*` variable reads it). All alias values are sourced
+ * from design-platform.css light/dark pairs; the literal fallback after the
+ * comma is only used when the host defines no theme tokens at all.
+ *
+ *   Surface tokens
+ *     --dsw-alias-bg-base        App canvas background.
+ *                                 light  = --dsw-static-neutral-bluish-00 (white)
+ *                                 dark   = --dsw-static-neutral-bluish-950 (~#151517)
+ *                                 consumed by: --wb-bg
+ *
+ *     --dsw-alias-bg-layer-1     Primary raised surface (cards, modals).
+ *                                 light  = --dsw-static-neutral-bluish-00
+ *                                 dark   = --dsw-static-neutral-bluish-875 (~#232324)
+ *                                 consumed by: --wb-panel, --wb-panel-solid
+ *
+ *     --dsw-alias-bg-layer-2     Secondary nested surface (inset wells).
+ *                                 light  = --dsw-static-neutral-bluish-00
+ *                                 dark   = --dsw-static-neutral-bluish-850 (~#2c2c2e)
+ *                                 consumed by: --wb-raised
+ *
+ *     --dsw-alias-bg-overlay     Overlay / popover / scrim surfaces.
+ *                                 light  = --dsw-static-neutral-bluish-150
+ *                                 dark   = --dsw-static-neutral-bluish-700
+ *                                 consumed by: --wb-overlay
+ *
+ *   Border tokens
+ *     --dsw-alias-border-l1      Subtle divider / hairline border.
+ *                                 light  = rgba(0, 0, 0, 0.04)
+ *                                 dark   = rgba(255, 255, 255, 0.06)
+ *                                 consumed by: --wb-line
+ *
+ *     --dsw-alias-border-l2      Stronger border (chips, cards, dividers).
+ *                                 light  = rgba(0, 0, 0, 0.10)
+ *                                 dark   = rgba(255, 255, 255, 0.12)
+ *                                 consumed by: --wb-line-strong, editor head/foot borders
+ *
+ *   Label tokens
+ *     --dsw-alias-label-primary      Primary ink color.
+ *                                 light  = --dsw-static-neutral-bluish-1000 (~#0f1115)
+ *                                 dark   = --dsw-static-neutral-bluish-50   (~#f9fafb)
+ *                                 consumed by: --wb-text (and, by extension, every
+ *                                                 --wb-glass-* / --wb-scrim / --wb-shadow
+ *                                                 mix that derives from --wb-text)
+ *
+ *     --dsw-alias-label-secondary    Secondary ink color (dimmed captions).
+ *                                 light  = --dsw-static-neutral-bluish-700
+ *                                 dark   = --dsw-static-neutral-bluish-300
+ *                                 consumed by: --wb-text-dim
+ *
+ *   Brand / accent tokens
+ *     --dsw-alias-brand-primary  Brand accent (focus rings, accent rail,
+ *                                 running ring, primary buttons, glyph fills).
+ *                                 light  = --dsw-static-neutral-bluish-1000 (~#0f1115)
+ *                                 dark   = --dsw-static-neutral-bluish-50   (~#f9fafb)
+ *                                 consumed by: --wb-accent
+ *
+ *   State tokens
+ *     --dsw-alias-state-error-primary    Error / danger ink & wash.
+ *                                 light  = --dsw-static-red-600  (~#ec1313)
+ *                                 dark   = --dsw-static-red-400  (~#f25a5a)
+ *                                 consumed by: --wb-danger
+ *
+ *     --dsw-alias-state-warn-primary     Warning ink & wash.
+ *                                 light  = --dsw-static-amber-500 (~#f59e0b)
+ *                                 dark   = --dsw-static-amber-500 (~#f59e0b)
+ *                                 consumed by: --wb-warn
+ *
+ *     --dsw-alias-state-success-primary  Success / completed-state ink.
+ *                                 light  = --dsw-static-green-500 (~#22c55e)
+ *                                 dark   = --dsw-static-green-500 (~#22c55e)
+ *                                 consumed by: --wb-ok
+ *
+ * Notes
+ *   • The engineering grid uses two recipes keyed off `[data-wb-scheme]`: a
+ *     faint wash of `--dsw-alias-label-primary` on the dark canvas (so the
+ *     grid retints with the host's ink token) and a faint wash of
+ *     `--dsw-alias-state-warn-primary` on the light canvas (so the gold
+ *     "engineering print" tint retints with the host's warn token). The
+ *     override is by `[data-wb-scheme]` on `:root`; the colour recipe itself
+ *     rides alias tokens, not literal rgba.
+ *   • --wb-glass-tint / --wb-glass-edge / --wb-glass-sheen / --wb-scrim /
+ *     --wb-scrim-strong / --wb-shadow are *derived* (color-mix on --wb-text
+ *     and #000), so they automatically follow the active theme without any
+ *     additional alias reference.
+ *   • The six card accents (azure / violet / amber / emerald / rose / slate)
+ *     are categorical identities (one per card position), but each one is
+ *     still derived from an alias token so the palette retints with the
+ *     active theme — rose follows the error token, amber the warn token,
+ *     emerald the success token, slate the dimmed-label token, and azure /
+ *     violet take l/c from the brand-primary token with a fixed hue so the
+ *     blue/purple read across both palettes. The literal fallback after the
+ *     comma is only used when the host defines no theme tokens at all.
  */
 
 /* ---- theme tokens (one home, shared with the portaled picker) ----
@@ -46,11 +155,80 @@
   --wb-scrim: color-mix(in srgb, #000 14%, transparent);
   --wb-scrim-strong: color-mix(in srgb, #000 38%, transparent);
   --wb-shadow: color-mix(in srgb, #000 30%, transparent);
-  /* The grid: white on the dark palette… */
-  --wb-grid-minor: rgba(255, 255, 255, 0.055);
-  --wb-grid-major: rgba(255, 255, 255, 0.11);
+  /* The grid: a faint trace of the label colour on the dark palette…
+     --dsw-alias-label-primary in the dark palette is near-white (neutral-bluish-50),
+     so mixing it at low alpha yields a cool, low-contrast grid that automatically
+     follows the host's ink token (any registered theme that retones label-primary
+     retints the grid with it, no further rule needed). */
+  --wb-grid-minor: color-mix(in srgb, var(--dsw-alias-label-primary, #ffffff) 5.5%, transparent);
+  --wb-grid-major: color-mix(in srgb, var(--dsw-alias-label-primary, #ffffff) 11%, transparent);
   --wb-grid-cell: 16px;
   --wb-grid-block: 80px;
+
+  /* ─── visual upgrade: radii, easing, depth, focus, sheen ───
+   * Every value below is derived from the alias tokens above so a theme swap
+   * retones the entire panel in lockstep with the host. No literal colours
+   * are introduced here.
+   */
+  /* Radii: five discrete steps used across the surface. Pickers and chips
+     collapse to the smaller steps so the panel rhythm is one number per role. */
+  --wb-radius-card: 18px;
+  --wb-radius-lg: 14px;
+  --wb-radius-md: 12px;
+  --wb-radius-sm: 10px;
+  --wb-radius-pill: 999px;
+  /* Spacing rhythm: the panel uses an 8-step grid where every surface aligns
+     to a multiple of 4px. These are the four sizes the visual upgrade picks
+     from, so padding and gap stay consistent without per-component numbers. */
+  --wb-pad-row: 16px;
+  --wb-pad-card: 16px;
+  --wb-gap-tight: 6px;
+  --wb-gap-row: 10px;
+  /* Sheen: the bright 1px highlight on the top edge of glass surfaces. It
+     rides the label colour so light panels show a near-white hairline and
+     dark panels show a near-black hairline, matching the canvas tone. */
+  --wb-rim-top: color-mix(in srgb, var(--wb-text) 26%, transparent);
+  --wb-rim-bottom: color-mix(in srgb, var(--wb-text) 6%, transparent);
+  /* Ambient halo: the soft outer glow a hover state casts onto the canvas.
+     Same accent as the card's own rail, held at a low alpha so it never
+     out-shouts the resting glass. */
+  --wb-ambient-halo: color-mix(in srgb, var(--wb-accent) 18%, transparent);
+  /* Focus ring: a double ring (outer accent 60% + inner glass white 60%) so
+     the focus mark reads in both palettes without losing the surface below. */
+  --wb-focus-ring: color-mix(in srgb, var(--wb-accent) 60%, transparent);
+  --wb-focus-inset: color-mix(in srgb, var(--wb-text) 60%, transparent);
+  /* Sheen angle — animated continuously on hover so the bright band slides
+     across the card surface. Declared via @property below so the
+     interpolation is smooth instead of stepping. */
+  --wb-sheen-angle: 0deg;
+  /* Easing token used across transitions. Mirrors the host's ease-in-out so
+     motion matches the surrounding shell without introducing a new curve. */
+  --wb-ease: var(--ds-ease-in-out);
+  /* ─── module material ───
+   * Three values the card's *shared* rules consume, declared here so a palette
+   * can swap the shape of the card's sheet and elevation without touching any
+   * hover, focus, or status rule. The dark palette keeps today's values
+   * verbatim, so declaring them changes nothing until the light block below
+   * overrides them:
+   *   --wb-card-base    the sheet's base colour (the last background layer);
+   *   --wb-card-rim     the 1px inset highlight on the sheet's lit edge;
+   *   --wb-card-shadow  the neutral depth shared by the resting, focus,
+   *                     completed, and pulse states. */
+  --wb-card-base: color-mix(in srgb, var(--wb-panel) 38%, transparent);
+  --wb-card-rim: color-mix(in srgb, var(--wb-text) 22%, transparent);
+  --wb-card-shadow: 0 10px 28px var(--wb-shadow);
+}
+
+/*
+ * Houdini registration for the hover-sheen angle: lets the running sheen slide
+ * the `--wb-sheen-angle` variable as a real angle. The card's hover state
+ * animates this value to drift a bright band across the surface. Harmless on
+ * hosts that ignore `@property`.
+ */
+@property --wb-sheen-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
 
 /*
@@ -70,10 +248,13 @@
 
 /*
  * The workbench is a global main panel, not an overlay: it fills the center
- * column and wears the host's own canvas color, so switching panels does not
- * change the page's tone. `color-scheme` is deliberately not set here — the
- * layout's theme presenter owns it on `html`, and a local override would fight
- * the native controls' palette.
+ * column and takes its canvas from `--wb-bg` — the host's own `bg-base` in the
+ * dark palette, and a faintly inked paper in the light one (see the light block
+ * below: the host's light canvas and its raised layer are both near-white, so a
+ * panel wearing the canvas verbatim would leave its white modules nothing to
+ * sit on). `color-scheme` is deliberately not set here — the layout's theme
+ * presenter owns it on `html`, and a local override would fight the native
+ * controls' palette.
  */
 .workbench {
   position: relative;
@@ -84,8 +265,18 @@
   min-height: 0;
   overflow: hidden;
   box-sizing: border-box;
+  /* The panel takes its canvas from `--wb-bg`, with three layered washes on top:
+     1) an accent halo behind the panel (brand-primary at low alpha) so the
+        centre column always reads as "tinted by the host's accent";
+     2) a top hairline light wash off the label token (the same token the grid
+        is mixed from, so the two layers agree on which colour is the "lit"
+        colour in either palette);
+     3) the canvas. The recipe keeps both palettes looking lifted rather than
+        flat, and every value rides an alias token, so a registered theme
+        retones all three washes in lockstep. */
   background:
-    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--wb-accent) 8%, transparent), transparent 70%),
+    radial-gradient(120% 60% at 50% -10%, var(--wb-ambient-halo), transparent 70%),
+    radial-gradient(140% 70% at 50% -8%, color-mix(in srgb, var(--wb-text) 6%, transparent), transparent 55%),
     var(--wb-bg);
 }
 
@@ -100,15 +291,43 @@
  * values; we mirror that with explicit fallbacks here so a host that omits the
  * tokens still gets the right tones. */
 :root[data-wb-scheme='light'] {
-  --wb-bg: var(--dsw-alias-bg-base, #f7f8fa);
+  /* The canvas is a faintly inked paper rather than the host's pure-white base:
+     in the light palette `bg-base`, `bg-layer-1` and `bg-overlay` are all
+     near-white, so modules painted straight from them dissolve into one
+     another. Tinting the canvas is what gives the white module sheets below
+     something to sit on. Mixed from the host's own ink and layer tokens, so a
+     third-party light theme retones it with no extra rule. */
+  --wb-bg: color-mix(in srgb, var(--wb-text) 6%, var(--dsw-alias-bg-layer-1, #ffffff));
   --wb-panel: var(--dsw-alias-bg-layer-1, #ffffff);
   --wb-panel-solid: var(--dsw-alias-bg-layer-1, #ffffff);
   --wb-overlay: var(--dsw-alias-bg-overlay, #ffffff);
-  --wb-scrim: color-mix(in srgb, var(--wb-text) 6%, transparent);
-  --wb-scrim-strong: color-mix(in srgb, var(--wb-text) 14%, transparent);
+  --wb-scrim: color-mix(in srgb, var(--wb-text) 5%, transparent);
+  --wb-scrim-strong: color-mix(in srgb, var(--wb-text) 13%, transparent);
   --wb-shadow: color-mix(in srgb, var(--wb-text) 12%, transparent);
-  --wb-grid-minor: rgba(176, 128, 24, 0.14);
-  --wb-grid-major: rgba(176, 128, 24, 0.3);
+  /* The top wash: on the light canvas the accent token is near-black (the host's
+     monochrome brand), so the dark palette's recipe would smear a grey cloud
+     over the paper. A white glow instead lifts the top of the sheet and lets the
+     modules below keep the eye. */
+  --wb-ambient-halo: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 72%, transparent);
+  /* Module material. A crisper hairline than the dark recipe (16% ink washes out
+     against a white sheet and the modules lose their outline), with a matching
+     but slightly lighter top rim; a white top highlight in place of the dark
+     palette's ink sheen (the "lit from above" cue belongs to the sheet's own
+     colour here); and a two-layer contact shadow — a tight line plus a wide
+     faint pool — in place of the single soft plunge. */
+  --wb-glass-edge: color-mix(in srgb, var(--wb-text) 14%, transparent);
+  --wb-rim-top: color-mix(in srgb, var(--wb-text) 10%, transparent);
+  --wb-card-base: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 94%, transparent);
+  --wb-card-rim: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 70%, transparent);
+  --wb-card-shadow:
+    0 1px 2px color-mix(in srgb, var(--wb-text) 8%, transparent),
+    0 12px 28px -10px color-mix(in srgb, var(--wb-text) 18%, transparent);
+  /* …amber-gold on the light palette: a faint wash of the warn token draws the
+     "engineering print" tint the spec asks for. Both warn tokens (light & dark)
+     are amber-500 in design-platform.css, so the same recipe works across themes
+     and follows any theme that retunes warn. */
+  --wb-grid-minor: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #b08018) 18%, transparent);
+  --wb-grid-major: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #b08018) 36%, transparent);
 }
 
 /*
@@ -139,11 +358,15 @@
 .notice {
   position: relative;
   margin: 0;
-  padding: 10px 20px;
+  padding: 10px 22px;
   border-bottom: 1px solid var(--wb-line);
-  background: color-mix(in srgb, var(--wb-warn) 14%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-warn) 16%, transparent),
+      color-mix(in srgb, var(--wb-warn) 10%, transparent));
   color: var(--wb-warn);
   font-size: 12px;
+  letter-spacing: 0.005em;
 }
 
 /* A failed add: red, one line, dismissible. Silence here is the bug it fixes. */
@@ -153,9 +376,12 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  padding: 10px 14px 10px 20px;
+  padding: 10px 14px 10px 22px;
   border-bottom: 1px solid color-mix(in srgb, var(--wb-danger) 32%, transparent);
-  background: color-mix(in srgb, var(--wb-danger) 14%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-danger) 16%, transparent),
+      color-mix(in srgb, var(--wb-danger) 10%, transparent));
   color: var(--wb-danger);
   font-size: 12px;
 }
@@ -178,6 +404,7 @@
   font-size: 11px;
   line-height: 1;
   cursor: pointer;
+  transition: background 180ms var(--wb-ease);
 }
 
 .noticeClose:hover {
@@ -192,8 +419,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 20px;
+  padding: 16px 22px;
   border-bottom: 1px solid var(--wb-line);
+  /* A hairline glass sheen at the very top edge — the same recipe as the
+     card's mirror highlight, so the head and the cards below share one
+     "lit" rim instead of two different glosses. */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--wb-text) 4%, transparent) 0%,
+    transparent 70%);
 }
 
 .headIdentity {
@@ -211,10 +444,21 @@
   height: 38px;
   flex: none;
   border: 1px solid var(--wb-line-strong);
-  border-radius: 12px;
-  background: linear-gradient(150deg, color-mix(in srgb, var(--wb-accent) 30%, transparent), color-mix(in srgb, var(--wb-accent) 5%, transparent));
+  border-radius: var(--wb-radius-md);
+  /* Two-layer background: an accent wash on the diagonal so the corner picks
+     up the brand hue, plus a faint top-rim highlight in the label colour so
+     the glyph reads as a tiny polished tile rather than a flat swatch. */
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 14%, transparent) 0%,
+      transparent 50%),
+    linear-gradient(150deg,
+      color-mix(in srgb, var(--wb-accent) 32%, transparent),
+      color-mix(in srgb, var(--wb-accent) 4%, transparent));
   color: color-mix(in srgb, var(--wb-accent) 62%, var(--wb-text));
-  box-shadow: 0 0 24px color-mix(in srgb, var(--wb-accent) 26%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-text) 22%, transparent),
+    0 0 24px color-mix(in srgb, var(--wb-accent) 26%, transparent);
 }
 
 .headText {
@@ -223,16 +467,17 @@
 
 .title {
   margin: 0;
-  font-size: 17px;
+  font-size: 15.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: -0.005em;
   color: var(--wb-text);
 }
 
 .subtitle {
   margin: 3px 0 0;
-  font-size: 12px;
-  color: var(--wb-text-faint);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--wb-text-dim) 78%, transparent);
 }
 
 .headActions {
@@ -247,15 +492,19 @@
   align-items: center;
   gap: 6px;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 12px;
   box-sizing: border-box;
   border: 1px solid color-mix(in srgb, var(--wb-ok) 34%, transparent);
-  border-radius: 999px;
+  border-radius: var(--wb-radius-pill);
   background: color-mix(in srgb, var(--wb-ok) 12%, transparent);
   color: var(--wb-ok);
   font-size: 11px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 600;
+  /* Same glass rim recipe as the cards so the chip reads as one tile with
+     its own polished edge instead of a sticker. */
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wb-text) 14%, transparent);
 }
 
 .liveDot {
@@ -263,7 +512,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--wb-ok);
-  box-shadow: 0 0 10px var(--wb-ok);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--wb-ok) 70%, transparent);
   animation: wbPulse 2s ease-in-out infinite;
 }
 
@@ -275,23 +524,39 @@
   padding: 0 12px;
   box-sizing: border-box;
   border: 1px solid var(--wb-line-strong);
-  border-radius: 9px;
+  border-radius: var(--wb-radius-md);
   background: color-mix(in srgb, var(--wb-glass-tint) 5%, transparent);
   color: var(--wb-text);
   font: inherit;
   font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  transition: background 0.16s var(--ds-ease-in-out), border-color 0.16s var(--ds-ease-in-out);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wb-text) 14%, transparent);
+  transition:
+    background 180ms var(--wb-ease),
+    border-color 180ms var(--wb-ease),
+    color 180ms var(--wb-ease),
+    transform 180ms var(--wb-ease);
 }
 
-.action:hover {
+.action:hover:not(:disabled) {
   background: color-mix(in srgb, var(--wb-glass-tint) 10%, transparent);
   border-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent);
+  transform: translateY(-1px);
+}
+
+.action:active:not(:disabled) {
+  transform: translateY(0);
+  background: color-mix(in srgb, var(--wb-glass-tint) 7%, transparent);
 }
 
 .action:focus-visible {
-  outline: 2px solid var(--wb-accent);
+  outline: 2px solid var(--wb-focus-ring);
   outline-offset: 2px;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-text) 14%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--wb-focus-ring) 30%, transparent);
 }
 
 .iconOnly {
@@ -303,16 +568,27 @@
   padding: 0;
   box-sizing: border-box;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--wb-radius-md);
   background: transparent;
   color: var(--wb-text-dim);
   cursor: pointer;
-  transition: background 0.16s var(--ds-ease-in-out), color 0.16s var(--ds-ease-in-out);
+  transition:
+    background 180ms var(--wb-ease),
+    color 180ms var(--wb-ease),
+    border-color 180ms var(--wb-ease),
+    transform 180ms var(--wb-ease);
 }
 
-.iconOnly:hover {
+.iconOnly:hover:not(:disabled) {
   background: color-mix(in srgb, var(--wb-glass-tint) 9%, transparent);
   color: var(--wb-text);
+  border-color: color-mix(in srgb, var(--wb-glass-tint) 14%, transparent);
+}
+
+.iconOnly:focus-visible {
+  outline: 2px solid var(--wb-focus-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--wb-focus-ring) 24%, transparent);
 }
 
 /* ---- live readings ---- */
@@ -321,39 +597,54 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  padding: 16px 20px;
+  gap: 10px;
+  padding: 14px 22px;
   border-bottom: 1px solid var(--wb-line);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 3%, transparent) 0%,
+      transparent 70%);
 }
 
 .reading {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 4px;
+  padding: 12px 14px 11px;
   border: 1px solid var(--wb-line);
-  border-radius: 14px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--wb-glass-tint) 6%, transparent), color-mix(in srgb, var(--wb-glass-tint) 2%, transparent));
+  border-top-color: var(--wb-rim-top);
+  border-radius: var(--wb-radius-lg);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 7%, transparent) 0%,
+      color-mix(in srgb, var(--wb-text) 1%, transparent) 100%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-text) 12%, transparent),
+    inset 0 -1px 0 var(--wb-rim-bottom);
 }
 
 .readingLabel {
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--wb-text-faint);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--wb-text-dim) 78%, transparent);
 }
 
 .readingValue {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
   line-height: 1.1;
+  letter-spacing: -0.02em;
   color: var(--wb-text);
   font-variant-numeric: tabular-nums;
 }
 
 .readingHint {
   font-size: 11px;
-  color: var(--wb-text-dim);
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--wb-text-dim) 80%, transparent);
   font-variant-numeric: tabular-nums;
 }
 
@@ -366,21 +657,30 @@
   overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 14px;
-  padding: 18px 20px 22px;
+  gap: 16px;
+  padding: 20px 22px 26px;
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent) transparent;
 }
 
 .projects::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .projects::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
-  border-radius: 8px;
+  border: 2px solid transparent;
+  border-radius: var(--wb-radius-pill);
   background-clip: content-box;
-  background-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent);
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent);
+  transition: background-color 180ms var(--wb-ease);
+}
+
+.projects::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 34%, transparent);
+}
+
+.projects::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /*
@@ -397,22 +697,38 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px 14px 12px;
+  padding: 16px 16px 14px;
   border: 1px solid var(--wb-glass-edge);
-  border-top-color: color-mix(in srgb, var(--wb-glass-tint) 26%, transparent);
-  border-radius: 18px;
+  border-top-color: var(--wb-rim-top);
+  border-radius: var(--wb-radius-card);
+  /* Three-layer background, painted bottom-up:
+     1) the panel-tinted wash (the "glass body" that lets the grid show through);
+     2) a soft accent wash at low alpha so the card picks up the brand hue
+        without committing to a coloured surface;
+     3) a diagonal light gradient on top, brightest at the lit corner, so the
+        card reads as a tilted pane of polished glass rather than a flat tile.
+     Plus a separate conic that carries the hover sheen — animated by
+     `--wb-sheen-angle` so it slides across the surface on hover. */
   background:
+    conic-gradient(from var(--wb-sheen-angle) at 50% 50%,
+      transparent 0deg,
+      color-mix(in srgb, var(--wb-text) 7%, transparent) 30deg,
+      transparent 70deg,
+      transparent 360deg),
     linear-gradient(158deg,
       color-mix(in srgb, var(--wb-glass-tint) 9%, transparent) 0%,
       color-mix(in srgb, var(--wb-glass-tint) 3%, transparent) 40%,
       color-mix(in srgb, var(--wb-glass-tint) 1%, transparent) 100%),
-    color-mix(in srgb, var(--wb-panel) 38%, transparent);
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--card-accent) 6%, transparent),
+      transparent 60%),
+    var(--wb-card-base);
   backdrop-filter: blur(22px) saturate(180%);
   -webkit-backdrop-filter: blur(22px) saturate(180%);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
-    0 10px 28px var(--wb-shadow);
+    inset 0 1px 0 var(--wb-card-rim),
+    inset 0 -1px 0 var(--wb-rim-bottom),
+    var(--wb-card-shadow);
   /*
    * No `overflow: hidden` here on purpose: the status ring layer (`.card::after`,
    * painted at `inset: -2px`) must extend 2px beyond the card's border-box so
@@ -420,8 +736,11 @@
    * card, not as a clipped halo. The file explorer inside the card manages its
    * own clipping, so the card-level overflow can stay open.
    */
-  transition: transform 0.22s var(--ds-ease-in-out), border-color 0.22s var(--ds-ease-in-out),
-    box-shadow 0.22s var(--ds-ease-in-out);
+  transition:
+    transform 220ms var(--wb-ease),
+    border-color 220ms var(--wb-ease),
+    box-shadow 220ms var(--wb-ease),
+    --wb-sheen-angle 1200ms var(--wb-ease);
 }
 
 /*
@@ -440,7 +759,7 @@
   position: absolute;
   inset: -2px;
   z-index: -1;
-  border-radius: 20px;
+  border-radius: calc(var(--wb-radius-card) + 2px);
   background: none;
   pointer-events: none;
   /* Conic angle — declared via `@property` below so the running animation can
@@ -464,11 +783,31 @@
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--wb-glass-tint) 24%, transparent);
+  /* Lift, sharpen the rim, deepen the shadow, and cast an accent halo. The
+     halo is a soft outer shadow in the card's own accent colour so the hover
+     state reads as "this card is lit from below by its identity colour". */
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--wb-glass-tint) 26%, transparent);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 30%, transparent),
-    0 18px 44px var(--wb-scrim-strong);
+    inset 0 1px 0 color-mix(in srgb, var(--wb-text) 30%, transparent),
+    inset 0 -1px 0 var(--wb-rim-bottom),
+    0 20px 48px var(--wb-scrim-strong),
+    0 0 0 1px color-mix(in srgb, var(--card-accent) 18%, transparent),
+    0 0 28px color-mix(in srgb, var(--card-accent) 14%, transparent);
+}
+
+.card:focus-visible {
+  /* Double focus ring: an outer accent ring at 2px and a softer accent halo
+     at 4px so the focus mark reads in both palettes without losing the
+     surface below it. We use box-shadow instead of outline so the ring can
+     be tinted by the alias tokens. */
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 var(--wb-card-rim),
+    inset 0 -1px 0 var(--wb-rim-bottom),
+    0 0 0 2px var(--wb-focus-ring),
+    0 0 0 4px color-mix(in srgb, var(--wb-focus-ring) 28%, transparent),
+    var(--wb-card-shadow);
 }
 
 /* The hover sheen moved with the old `::after`. Hover feedback is now carried
@@ -505,17 +844,24 @@
   padding: 2px 4px 2px 2px;
   margin: -2px -4px -2px -2px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--wb-radius-md);
   background: transparent;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.16s var(--ds-ease-in-out);
+  transition:
+    background 180ms var(--wb-ease),
+    transform 180ms var(--wb-ease);
 }
 
 .cardOpen:hover:not(:disabled) {
   background: color-mix(in srgb, var(--wb-glass-tint) 7%, transparent);
+}
+
+.cardOpen:active:not(:disabled) {
+  background: color-mix(in srgb, var(--wb-glass-tint) 11%, transparent);
+  transform: translateX(1px);
 }
 
 .cardOpen:disabled {
@@ -523,8 +869,9 @@
 }
 
 .cardOpen:focus-visible {
-  outline: 2px solid var(--wb-accent);
+  outline: 2px solid var(--wb-focus-ring);
   outline-offset: 1px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--wb-focus-ring) 24%, transparent);
 }
 
 .cardGlyph {
@@ -532,12 +879,26 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--wb-line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--card-accent) 16%, transparent);
+  width: 28px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 24%, transparent);
+  border-radius: var(--wb-radius-md);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 14%, transparent) 0%,
+      transparent 55%),
+    color-mix(in srgb, var(--card-accent) 18%, transparent);
   color: var(--card-accent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-text) 18%, transparent),
+    0 0 14px color-mix(in srgb, var(--card-accent) 22%, transparent);
+  transition: box-shadow 220ms var(--wb-ease), border-color 220ms var(--wb-ease);
+}
+
+.cardOpen:hover:not(:disabled) .cardGlyph {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-text) 22%, transparent),
+    0 0 20px color-mix(in srgb, var(--card-accent) 36%, transparent);
 }
 
 .cardTitle {
@@ -546,8 +907,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
+  letter-spacing: -0.005em;
   color: var(--wb-text);
 }
 
@@ -558,9 +920,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--ds-font-family-code);
-  font-size: 11.5px;
-  letter-spacing: -0.01em;
+  font-size: 11px;
+  letter-spacing: -0.005em;
   color: color-mix(in srgb, var(--wb-accent) 55%, var(--wb-text));
+  opacity: 0.92;
 }
 
 /* ---- the file explorer (a VS Code-shaped tree inside a card) ---- */
@@ -577,9 +940,11 @@
   flex: 1;
   min-height: 0;
   border: 1px solid var(--wb-line);
-  border-radius: 12px;
+  border-top-color: var(--wb-rim-top);
+  border-radius: var(--wb-radius-md);
   background: var(--wb-scrim);
   overflow: hidden;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wb-text) 10%, transparent);
 }
 
 .explorerHead {
@@ -587,15 +952,15 @@
   align-items: center;
   gap: 4px;
   flex: none;
-  height: 26px;
+  height: 28px;
   padding: 0 6px 0 4px;
   border-bottom: 1px solid var(--wb-line);
-  background: color-mix(in srgb, var(--wb-glass-tint) 4%, transparent);
+  background: color-mix(in srgb, var(--wb-glass-tint) 5%, transparent);
 }
 
 .explorerCaret {
   flex: none;
-  color: var(--wb-text-faint);
+  color: color-mix(in srgb, var(--wb-text-dim) 78%, transparent);
 }
 
 .explorerTitle {
@@ -603,10 +968,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--wb-text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--wb-text-dim) 88%, transparent);
 }
 
 .explorerParent {
@@ -617,7 +983,7 @@
   white-space: nowrap;
   text-align: right;
   font-size: 10.5px;
-  color: var(--wb-text-faint);
+  color: color-mix(in srgb, var(--wb-text-dim) 62%, transparent);
 }
 
 .explorerTools {
@@ -631,15 +997,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--wb-text-dim);
   cursor: pointer;
-  transition: background 0.14s var(--ds-ease-in-out), color 0.14s var(--ds-ease-in-out);
+  transition:
+    background 180ms var(--wb-ease),
+    color 180ms var(--wb-ease);
 }
 
 .explorerTool:hover:not(:disabled) {
@@ -648,7 +1016,7 @@
 }
 
 .explorerTool:disabled {
-  color: var(--wb-text-faint);
+  color: color-mix(in srgb, var(--wb-text-dim) 50%, transparent);
   cursor: default;
   opacity: 0.5;
 }
@@ -656,7 +1024,7 @@
 .explorerTool:focus-visible,
 .explorerRow:focus-visible,
 .explorerRetry:focus-visible {
-  outline: 1px solid var(--wb-accent);
+  outline: 1px solid var(--wb-focus-ring);
   outline-offset: -1px;
 }
 
@@ -668,18 +1036,27 @@
   list-style: none;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent) transparent;
 }
 
 .explorerRows::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .explorerRows::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
-  border-radius: 8px;
+  border: 2px solid transparent;
+  border-radius: var(--wb-radius-pill);
   background-clip: content-box;
-  background-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent);
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent);
+  transition: background-color 180ms var(--wb-ease);
+}
+
+.explorerRows::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 34%, transparent);
+}
+
+.explorerRows::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .explorerItem {
@@ -703,6 +1080,9 @@
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background 160ms var(--wb-ease),
+    color 160ms var(--wb-ease);
 }
 
 /* VS Code's hover band, then its focus band: hover is lighter than selection. */
@@ -711,12 +1091,21 @@
 }
 
 .explorerRowSelected {
-  background: color-mix(in srgb, var(--wb-accent) 20%, transparent);
+  background: color-mix(in srgb, var(--wb-accent) 22%, transparent);
   box-shadow: inset 2px 0 0 var(--wb-accent);
+  color: var(--wb-text);
 }
 
 .explorerRowSelected:hover {
-  background: color-mix(in srgb, var(--wb-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--wb-accent) 28%, transparent);
+}
+
+.explorerRow:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--wb-accent) 12%, transparent);
+  box-shadow:
+    inset 0 0 0 1px var(--wb-focus-ring),
+    inset 2px 0 0 var(--wb-accent);
 }
 
 /* One indent guide per ancestor level, drawn on the row's own backdrop. */
@@ -734,7 +1123,8 @@
   justify-content: center;
   flex: none;
   width: 14px;
-  color: var(--wb-text-faint);
+  color: color-mix(in srgb, var(--wb-text-dim) 78%, transparent);
+  transition: color 160ms var(--wb-ease);
 }
 
 .explorerRow:hover .explorerGlyph {
@@ -747,7 +1137,8 @@
   justify-content: center;
   flex: none;
   width: 18px;
-  color: color-mix(in srgb, var(--wb-accent) 42%, var(--wb-text-dim));
+  color: color-mix(in srgb, var(--wb-accent) 50%, var(--wb-text-dim));
+  transition: color 160ms var(--wb-ease);
 }
 
 .explorerRow[data-explorer-kind='file'] .explorerIcon {
@@ -765,7 +1156,8 @@
   flex: none;
   padding-left: 8px;
   font-size: 10.5px;
-  color: var(--wb-text-faint);
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--wb-text-dim) 60%, transparent);
   font-variant-numeric: tabular-nums;
 }
 
@@ -778,7 +1170,7 @@
   padding: 0 6px 0 4px;
   box-sizing: border-box;
   font-size: 11.5px;
-  color: var(--wb-text-faint);
+  color: color-mix(in srgb, var(--wb-text-dim) 70%, transparent);
 }
 
 .explorerNoteText {
@@ -801,16 +1193,20 @@
   padding: 0 8px;
   height: 18px;
   border: 1px solid var(--wb-line-strong);
-  border-radius: 999px;
+  border-radius: var(--wb-radius-pill);
   background: transparent;
   color: var(--wb-text);
   font: inherit;
   font-size: 10.5px;
   cursor: pointer;
+  transition:
+    background 180ms var(--wb-ease),
+    border-color 180ms var(--wb-ease);
 }
 
 .explorerRetry:hover {
   background: color-mix(in srgb, var(--wb-glass-tint) 11%, transparent);
+  border-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent);
 }
 
 .explorerSpin {
@@ -823,15 +1219,17 @@
   padding: 14px 12px;
   font-size: 12px;
   color: var(--wb-text-dim);
+  line-height: 1.5;
 }
 
 .explorerFoot {
   flex: none;
   margin: 0;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border-top: 1px solid var(--wb-line);
   font-size: 10.5px;
-  color: var(--wb-text-faint);
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--wb-text-dim) 62%, transparent);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -871,7 +1269,7 @@
 }
 
 .pickerCrumbSep {
-  color: var(--wb-text-faint);
+  color: color-mix(in srgb, var(--wb-text-dim) 50%, transparent);
 }
 
 .pickerCrumb {
@@ -887,6 +1285,9 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  transition:
+    background 180ms var(--wb-ease),
+    color 180ms var(--wb-ease);
 }
 
 .pickerCrumb:hover {
@@ -931,6 +1332,7 @@
   font-family: var(--ds-font-family-code);
   font-size: 11.5px;
   color: color-mix(in srgb, var(--wb-accent) 55%, var(--wb-text));
+  opacity: 0.92;
 }
 
 .pickerToggle {
@@ -956,6 +1358,9 @@
   background: transparent;
   color: var(--wb-text-dim);
   cursor: pointer;
+  transition:
+    background 180ms var(--wb-ease),
+    color 180ms var(--wb-ease);
 }
 
 .pickerTool:hover:not(:disabled) {
@@ -979,7 +1384,7 @@
   margin: 0 0 8px;
   padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--wb-danger) 32%, transparent);
-  border-radius: 8px;
+  border-radius: var(--wb-radius-sm);
   background: color-mix(in srgb, var(--wb-danger) 14%, transparent);
   color: var(--wb-danger);
   font-size: 11.5px;
@@ -991,21 +1396,32 @@
   overflow: auto;
   padding: 4px 0;
   border: 1px solid var(--wb-line);
-  border-radius: 10px;
+  border-top-color: var(--wb-rim-top);
+  border-radius: var(--wb-radius-md);
   background: var(--wb-scrim);
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent) transparent;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wb-text) 10%, transparent);
 }
 
 .pickerRows::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .pickerRows::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
-  border-radius: 8px;
+  border: 2px solid transparent;
+  border-radius: var(--wb-radius-pill);
   background-clip: content-box;
-  background-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent);
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent);
+  transition: background-color 180ms var(--wb-ease);
+}
+
+.pickerRows::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 34%, transparent);
+}
+
+.pickerRows::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .pickerRow {
@@ -1024,6 +1440,7 @@
   text-align: left;
   white-space: nowrap;
   cursor: pointer;
+  transition: background 160ms var(--wb-ease);
 }
 
 .pickerRow:hover {
@@ -1037,7 +1454,7 @@
   margin: 0;
   padding: 8px 10px;
   font-size: 11.5px;
-  color: var(--wb-text-faint);
+  color: color-mix(in srgb, var(--wb-text-dim) 62%, transparent);
 }
 
 /* ---- the workbench file editor (a right-column page tab) ----
@@ -1061,8 +1478,9 @@
   align-items: center;
   gap: 6px;
   flex: none;
-  padding: 6px 8px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--dsw-alias-border-l2, var(--wb-line));
+  background: color-mix(in srgb, var(--wb-text) 3%, transparent);
 }
 
 .editorName {
@@ -1177,8 +1595,9 @@
   align-items: center;
   gap: 8px;
   flex: none;
-  padding: 6px 8px;
+  padding: 6px 10px;
   border-top: 1px solid var(--dsw-alias-border-l2, var(--wb-line));
+  background: color-mix(in srgb, var(--wb-text) 3%, transparent);
 }
 
 .editorHint {
@@ -1202,12 +1621,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding-top: 2px;
+  padding-top: 4px;
+  margin-top: 2px;
+  border-top: 1px solid color-mix(in srgb, var(--wb-text) 6%, transparent);
 }
 
 .cardUpdated {
-  font-size: 11px;
-  color: var(--wb-text-faint);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--wb-text-dim) 62%, transparent);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1255,8 +1677,8 @@
     var(--wb-accent) 338deg,
     var(--wb-accent) 360deg);
   box-shadow:
-    0 0 18px color-mix(in srgb, var(--wb-accent) 50%, transparent),
-    inset 0 0 18px color-mix(in srgb, var(--wb-accent) 35%, transparent);
+    0 0 22px color-mix(in srgb, var(--wb-accent) 60%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--wb-accent) 38%, transparent);
   animation: wbRingSpin 1.6s linear infinite;
 }
 
@@ -1269,7 +1691,7 @@
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
     inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
-    0 10px 28px var(--wb-shadow),
+    var(--wb-card-shadow),
     0 0 0 0 color-mix(in srgb, var(--wb-ok) 60%, transparent);
 }
 
@@ -1287,7 +1709,7 @@
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
     inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
-    0 10px 28px var(--wb-shadow);
+    var(--wb-card-shadow);
 }
 
 /* The empty card slot: one more route into the workspace add flow. */
@@ -1299,22 +1721,38 @@
   gap: 6px;
   min-height: 190px;
   padding: 18px;
-  border: 1px dashed var(--wb-line-strong);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--wb-glass-tint) 3%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--wb-line-strong) 100%, transparent);
+  border-radius: var(--wb-radius-card);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 4%, transparent) 0%,
+      transparent 70%),
+    color-mix(in srgb, var(--wb-glass-tint) 3%, transparent);
   backdrop-filter: blur(14px) saturate(150%);
   -webkit-backdrop-filter: blur(14px) saturate(150%);
   color: var(--wb-text-dim);
   font: inherit;
   cursor: pointer;
-  transition: border-color 0.18s var(--ds-ease-in-out), background 0.18s var(--ds-ease-in-out),
-    transform 0.18s var(--ds-ease-in-out);
+  transition:
+    border-color 180ms var(--wb-ease),
+    background 180ms var(--wb-ease),
+    color 180ms var(--wb-ease),
+    transform 180ms var(--wb-ease),
+    box-shadow 180ms var(--wb-ease);
 }
 
 .addCard:hover:not(:disabled) {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: color-mix(in srgb, var(--wb-accent) 60%, transparent);
-  background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 6%, transparent) 0%,
+      transparent 70%),
+    color-mix(in srgb, var(--wb-accent) 8%, transparent);
+  color: var(--wb-text);
+  box-shadow:
+    0 18px 44px var(--wb-scrim-strong),
+    0 0 24px color-mix(in srgb, var(--wb-accent) 14%, transparent);
 }
 
 .addCard:disabled {
@@ -1326,33 +1764,71 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border: 1px solid var(--wb-line-strong);
-  border-radius: 14px;
-  background: linear-gradient(150deg, color-mix(in srgb, var(--wb-accent) 24%, transparent), transparent);
+  border-radius: var(--wb-radius-lg);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 16%, transparent) 0%,
+      transparent 55%),
+    linear-gradient(150deg,
+      color-mix(in srgb, var(--wb-accent) 28%, transparent),
+      transparent);
   color: color-mix(in srgb, var(--wb-accent) 62%, var(--wb-text));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wb-text) 22%, transparent);
+  transition: box-shadow 220ms var(--wb-ease);
+}
+
+.addCard:hover:not(:disabled) .addGlyph {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-text) 22%, transparent),
+    0 0 22px color-mix(in srgb, var(--wb-accent) 36%, transparent);
 }
 
 .addTitle {
   font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--wb-text);
 }
 
 .addHint {
-  font-size: 11.5px;
-  color: var(--wb-text-faint);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--wb-text-dim) 70%, transparent);
 }
 
 
-/* ---- accent palette ---- */
-
-.accent_azure { --card-accent: rgb(103, 158, 254); }
-.accent_violet { --card-accent: rgb(167, 139, 250); }
-.accent_amber { --card-accent: rgb(247, 173, 49); }
-.accent_emerald { --card-accent: rgb(78, 209, 126); }
-.accent_rose { --card-accent: var(--wb-danger); }
-.accent_slate { --card-accent: rgb(151, 157, 166); }
+/* ---- accent palette ----
+ *
+ * Six categorical card identities. Each is derived from a DSH alias token so
+ * the palette tracks the active theme automatically:
+ *   • azure    : brand-primary (neutral-bluish), held at hue 240 to read as blue
+ *   • violet   : brand-primary, held at hue 290 to read as purple
+ *   • amber    : state-warn-primary (amber-500 in both palettes — already the
+ *               warning colour across light/dark)
+ *   • emerald  : state-success-primary (green-500 in both palettes)
+ *   • rose     : state-error-primary (red-600 light / red-400 dark)
+ *   • slate    : label-secondary (the dimmed ink — neutral, "deactivated" card)
+ *
+ * Azure/violet use `oklch(from ... l 0.16 H)` so only the lightness rides on
+ * `--dsw-alias-brand-primary` (light = neutral-bluish-1000, dark = neutral-bluish-50).
+ * The chroma cannot ride on it because that token is near-achromatic
+ * (chroma ≈ 0.006 light / 0.003 dark), so copying its `c` would swallow the
+ * hue and the card accent would render as a near-neutral grey in both palettes.
+ * Pinning chroma at 0.16 keeps a saturated blue / purple that still tracks the
+ * theme's lightness (dark blue on the light canvas, pale blue on the dark
+ * canvas) without any further per-theme rule. The literal fallback after the
+ * comma is the pre-token hard-coded swatch, kept for hosts that declare no
+ * theme tokens.
+ */
+.accent_azure { --card-accent: oklch(from var(--dsw-alias-brand-primary, rgb(103, 158, 254)) l 0.16 240); }
+.accent_violet { --card-accent: oklch(from var(--dsw-alias-brand-primary, rgb(167, 139, 250)) l 0.16 290); }
+.accent_amber { --card-accent: var(--dsw-alias-state-warn-primary, rgb(247, 173, 49)); }
+.accent_emerald { --card-accent: var(--dsw-alias-state-success-primary, rgb(78, 209, 126)); }
+.accent_rose { --card-accent: var(--dsw-alias-state-error-primary, rgb(228, 92, 92)); }
+.accent_slate { --card-accent: var(--dsw-alias-label-secondary, rgb(151, 157, 166)); }
 
 /* ---- empty state ---- */
 
@@ -1365,8 +1841,12 @@
   gap: 8px;
   padding: 56px 24px;
   border: 1px dashed var(--wb-line-strong);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--wb-glass-tint) 3%, transparent);
+  border-radius: var(--wb-radius-card);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 4%, transparent) 0%,
+      transparent 70%),
+    color-mix(in srgb, var(--wb-glass-tint) 3%, transparent);
   backdrop-filter: blur(14px) saturate(150%);
   -webkit-backdrop-filter: blur(14px) saturate(150%);
   text-align: center;
@@ -1376,24 +1856,34 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border: 1px solid var(--wb-line-strong);
-  border-radius: 14px;
-  background: linear-gradient(150deg, color-mix(in srgb, var(--wb-accent) 24%, transparent), transparent);
+  border-radius: var(--wb-radius-lg);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 16%, transparent) 0%,
+      transparent 55%),
+    linear-gradient(150deg,
+      color-mix(in srgb, var(--wb-accent) 28%, transparent),
+      transparent);
   color: color-mix(in srgb, var(--wb-accent) 62%, var(--wb-text));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--wb-text) 22%, transparent);
 }
 
 .emptyTitle {
   margin: 6px 0 0;
   font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--wb-text);
 }
 
 .emptyHint {
   margin: 0 0 10px;
   font-size: 12px;
-  color: var(--wb-text-faint);
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--wb-text-dim) 72%, transparent);
 }
 
 /* ---- foot ---- */
@@ -1403,14 +1893,166 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
+  padding: 10px 22px;
   border-top: 1px solid var(--wb-line);
   background: var(--wb-scrim);
 }
 
 .footHint {
-  font-size: 11px;
-  color: var(--wb-text-faint);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--wb-text-dim) 64%, transparent);
+}
+
+/* ==========================================================================
+ * Light palette: module separation
+ * --------------------------------------------------------------------------
+ * In the light palette the host's canvas, its raised layer, and its overlay are
+ * all near-white, so modules painted straight from those aliases dissolve into
+ * one another. The token block above already carries every palette-specific
+ * value the *shared* rules consume (`--wb-bg` / `--wb-ambient-halo` /
+ * `--wb-glass-edge` / `--wb-rim-top` / `--wb-card-base` / `--wb-card-rim` /
+ * `--wb-card-shadow`), which is what keeps the card's hover, focus, and
+ * running/completed states coherent instead of being re-declared here. What
+ * follows are the modules whose whole material differs and that carry no state
+ * of their own, so one scoped rule each is enough:
+ *
+ *   head       a white bar floating above the scrolling grid
+ *   headGlyph  a solid ink keystone with a sheet-coloured mark
+ *   readings   a tinted tray carrying white instrument tiles
+ *   card       a white sheet (base and elevation ride the tokens above)
+ *   explorer   a well recessed into the card
+ *   foot       a muted status strip, dimmer than the tray above it
+ *   add/empty  translucent slots with a real hairline and a contact shadow
+ *
+ * The scoped selector outranks the shared rule it overrides, so the rules here
+ * are complete declarations, not deltas. Every colour is mixed from the host's
+ * ink and layer tokens, so a third-party light theme retones the whole stack
+ * with no extra rule.
+ * ========================================================================== */
+
+/* The head: a white bar with a hairline beneath and a soft shadow, so the card
+   grid scrolls *behind* it rather than through it. */
+:root[data-wb-scheme='light'] .panelHead {
+  z-index: 2;
+  border-bottom-color: var(--wb-glass-edge);
+  background: var(--wb-panel);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--wb-text) 4%, transparent),
+    0 8px 18px -10px color-mix(in srgb, var(--wb-text) 16%, transparent);
+}
+
+/* The panel's identity mark: a solid ink keystone with a sheet-coloured glyph,
+   instead of the dark palette's accent-washed tile. The host's light brand is
+   near-black, so "ink" is the palette's own accent — a filled badge reads as
+   deliberate where a low-alpha wash of the same colour reads as faded. */
+:root[data-wb-scheme='light'] .headGlyph {
+  border-color: color-mix(in srgb, var(--wb-text) 88%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-panel) 18%, transparent) 0%,
+      transparent 52%),
+    linear-gradient(150deg,
+      color-mix(in srgb, var(--wb-text) 96%, transparent),
+      color-mix(in srgb, var(--wb-text) 76%, transparent));
+  color: var(--wb-panel);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-panel) 30%, transparent),
+    0 6px 16px -6px color-mix(in srgb, var(--wb-text) 42%, transparent);
+}
+
+/* The readings strip: a tinted tray. The white tiles standing on it are what
+   make the four figures read as four instruments instead of one band. */
+:root[data-wb-scheme='light'] .readings {
+  border-bottom-color: var(--wb-glass-edge);
+  background: color-mix(in srgb, var(--wb-text) 5%, transparent);
+}
+
+/* One instrument tile. The first background layer is a 2px accent rail pinned
+   to the tile's top edge and clipped by its own radius — the strip's single
+   flourish, drawn as a background so it needs no extra element or overflow. */
+:root[data-wb-scheme='light'] .reading {
+  border-color: var(--wb-glass-edge);
+  border-top-color: var(--wb-rim-top);
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, var(--wb-accent) 34%, transparent) 0%,
+      transparent 42%) top left / 100% 2px no-repeat,
+    color-mix(in srgb, var(--wb-panel) 96%, transparent);
+  box-shadow:
+    inset 0 1px 0 var(--wb-card-rim),
+    var(--wb-card-shadow);
+}
+
+/* The card: a white sheet. Base colour, hairline, top highlight and elevation
+   all ride the tokens above, so this rule repaints only the background — the
+   one property the card's hover, focus, and status rules never touch. The dark
+   palette's four-layer glass becomes a two-layer sheet with a faint accent wash
+   at the lit edge, and the blur is eased off because there is far less colour
+   behind a light card for it to smear. */
+:root[data-wb-scheme='light'] .card {
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--card-accent) 6%, transparent) 0%,
+      transparent 56%),
+    var(--wb-card-base);
+}
+
+/* The explorer: a well carved into the sheet. `--wb-scrim` already reads as a
+   faint grey here, but a well needs its own rim and an inner shadow or it
+   disappears into the white card around it. */
+:root[data-wb-scheme='light'] .explorer {
+  border-color: var(--wb-glass-edge);
+  border-top-color: var(--wb-glass-edge);
+  background: color-mix(in srgb, var(--wb-text) 4%, transparent);
+  box-shadow: inset 0 2px 5px color-mix(in srgb, var(--wb-text) 9%, transparent);
+}
+
+:root[data-wb-scheme='light'] .explorerHead {
+  border-bottom-color: color-mix(in srgb, var(--wb-text) 8%, transparent);
+  background: color-mix(in srgb, var(--wb-text) 5%, transparent);
+}
+
+/* The foot: a muted status strip, dimmer than the readings tray so the shell
+   reads as head → tray → body → plinth. */
+:root[data-wb-scheme='light'] .panelFoot {
+  border-top-color: var(--wb-glass-edge);
+  background: color-mix(in srgb, var(--wb-text) 5%, transparent);
+}
+
+/* The empty slot and the empty state: still translucent so the gold grid shows
+   through, but with a real hairline and the same contact shadow a card casts,
+   so an empty grid reads as a layout rather than as a hole. */
+:root[data-wb-scheme='light'] .addCard {
+  border-color: color-mix(in srgb, var(--wb-text) 18%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-text) 3%, transparent) 0%,
+      transparent 70%),
+    color-mix(in srgb, var(--wb-panel) 52%, transparent);
+  box-shadow: var(--wb-card-shadow);
+}
+
+:root[data-wb-scheme='light'] .addCard:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--wb-accent) 52%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--wb-accent) 5%, transparent) 0%,
+      transparent 70%),
+    var(--wb-panel);
+  box-shadow:
+    0 2px 4px color-mix(in srgb, var(--wb-text) 8%, transparent),
+    0 22px 44px -14px color-mix(in srgb, var(--wb-text) 20%, transparent),
+    0 0 24px color-mix(in srgb, var(--wb-accent) 12%, transparent);
+}
+
+:root[data-wb-scheme='light'] .empty {
+  border-color: color-mix(in srgb, var(--wb-text) 16%, transparent);
+  background: color-mix(in srgb, var(--wb-panel) 58%, transparent);
 }
 
 /* ---- narrow windows and motion preferences ---- */
@@ -1428,6 +2070,18 @@
 @keyframes wbPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+/*
+ * Card sheen drift: the bright band painted by the conic on `.card` advances
+ * around the card on hover. The conic itself is static — only the angle
+ * variable moves — which keeps the recipe declarative. Driven by
+ * `transition: --wb-sheen-angle …` on `.card` itself; this keyframe is kept
+ * available for hosts that prefer an animation over a transition.
+ */
+@keyframes wbSheenDrift {
+  from { --wb-sheen-angle: 0deg; }
+  to { --wb-sheen-angle: 360deg; }
 }
 
 @keyframes wbSpin {
@@ -1455,14 +2109,14 @@
     box-shadow:
       inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
       inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
-      0 10px 28px var(--wb-shadow),
+      var(--wb-card-shadow),
       0 0 0 0 color-mix(in srgb, var(--wb-ok) 60%, transparent);
   }
   50% {
     box-shadow:
       inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
       inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
-      0 10px 28px var(--wb-shadow),
+      var(--wb-card-shadow),
       0 0 0 6px color-mix(in srgb, var(--wb-ok) 0%, transparent);
   }
 }
@@ -1480,8 +2134,35 @@
     animation: none;
   }
 
+  /* Suppress every transition we added during the visual upgrade so a
+     reduced-motion reader gets the panel as a static composition: no card
+     lift, no sheen drift, no hover delays, no focus halo animation, and the
+     sheen angle is reset to its initial value so the conic layer does not
+     show a mid-transition slice. */
   .card,
-  .addCard {
+  .card::after,
+  .addCard,
+  .addGlyph,
+  .cardOpen,
+  .cardGlyph,
+  .action,
+  .iconOnly,
+  .noticeClose,
+  .explorerTool,
+  .explorerRow,
+  .explorerGlyph,
+  .explorerIcon,
+  .explorerRetry,
+  .explorerRows::-webkit-scrollbar-thumb,
+  .pickerCrumb,
+  .pickerRow,
+  .pickerTool,
+  .pickerRows::-webkit-scrollbar-thumb,
+  .projects::-webkit-scrollbar-thumb {
     transition: none;
+  }
+
+  .card {
+    --wb-sheen-angle: 0deg;
   }
 }
