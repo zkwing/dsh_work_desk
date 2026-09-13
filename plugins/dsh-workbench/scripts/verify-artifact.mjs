@@ -130,6 +130,7 @@ function createHost(initial = {}) {
   const waiting = []
   const seats = []
   const dictionaries = []
+  const listeners = new Map()
   const host = {
     locale: {
       register(namespace, dicts) { dictionaries.push({ namespace, dicts }); return () => {} },
@@ -154,6 +155,20 @@ function createHost(initial = {}) {
     },
     effect(fn) { fn(); return () => {} },
     get(name) { return services.get(name) },
+    // The event bus the plugin subscribes to (`theme/change` today). Emission is
+    // explicit so a check can drive the change and read the live source after.
+    on(name, callback) {
+      const bucket = listeners.get(name) ?? []
+      bucket.push(callback)
+      listeners.set(name, bucket)
+      return () => {
+        const current = listeners.get(name) ?? []
+        listeners.set(name, current.filter(entry => entry !== callback))
+      }
+    },
+    emit(name, payload) {
+      for (const callback of [...(listeners.get(name) ?? [])]) callback(payload)
+    },
     inject(deps, callback) {
       // `scope.effect` mirrors cordis, and each dependency appears on the scope
       // as a live property read: an injected scope carries its services, and a
@@ -175,7 +190,7 @@ function createHost(initial = {}) {
       }
     },
   }
-  return { host, seats, dictionaries, provide: host.provide, mounted: services }
+  return { host, seats, dictionaries, provide: host.provide, emit: host.emit, mounted: services }
 }
 
 /** The recorded services one host's faces call, so the checks can read them back. */
@@ -189,6 +204,7 @@ function createServices() {
   const tabTypes = []
   const openedSessions = []
   const selectedPanels = []
+  const scheme = { current: 'dark' }
   const state = {
     // `directoryPicker.pick` answer for the next call.
     pickReply: { ok: true, value: 'D:\\3_WorkProject\\demo' },
@@ -215,6 +231,12 @@ function createServices() {
     tabTypes,
     openedSessions,
     selectedPanels,
+    scheme,
+    // The theme service: the only thing the panel reads from it is the resolved
+    // color scheme, which decides the background grid's color.
+    theme: {
+      getTheme() { return { active: { colorScheme: scheme.current } } },
+    },
     state,
     // The tab-type registry `ui-sidebar-right` provides.
     sidebarRightTabs: {
@@ -329,6 +351,7 @@ const a = createHost({
   sidebarRightTabs: full.sidebarRightTabs,
   sessions: full.sessions,
   layout: full.layout,
+  theme: full.theme,
   remote: { workspaceFiles: full.workspaceFiles, directoryPicker: full.directoryPicker },
 })
 let threw
@@ -394,6 +417,30 @@ check(typeof injected?.removeWorkspace === 'function', 'the panel injects Worksp
 check(typeof injected?.listDirectory === 'function', 'the panel injects the directory lister')
 check(typeof injected?.hooks?.capability?.getSnapshot === 'function',
   'the panel injects the capability source as a hook, not as a captured flag')
+check(injected?.hooks?.scheme?.getSnapshot() === true,
+  'the panel injects the color scheme as a live source, seeded from the theme service')
+// The grid is white on a dark palette and gold on a light one, so the source has
+// to follow the host theme rather than a build-time constant.
+a.emit('theme/change', { active: { colorScheme: 'light' } })
+check(injected?.hooks?.scheme?.getSnapshot() === false,
+  'a theme change flips the scheme source the panel renders the grid from')
+// …and the seed reads the service rather than a build-time constant: a host
+// whose active theme is light starts the panel on the light grid.
+const lightHost = createServices()
+const light = createHost({
+  uiWorkspace: lightHost.uiWorkspace,
+  workspaces: lightHost.workspaces,
+  'remote.workspaceFiles': lightHost.workspaceFiles,
+  'remote.directoryPicker': lightHost.directoryPicker,
+  sidebarRight: lightHost.sidebarRight,
+  sidebarRightTabs: lightHost.sidebarRightTabs,
+  sessions: lightHost.sessions,
+  layout: lightHost.layout,
+  theme: { getTheme: () => ({ active: { colorScheme: 'light' } }) },
+})
+exports.apply(light.host)
+check(seatsOf(light.seats).panel.options?.inject?.().hooks?.scheme?.getSnapshot() === false,
+  'a host whose active theme is light seeds the scheme source on the light palette')
 check(JSON.stringify(injected?.hooks?.capability?.getSnapshot())
   === '{"navigation":true,"workspaces":true,"files":true,"picker":true,"pane":true}',
   `a fully provisioned host reports every capability mounted (got ${JSON.stringify(injected?.hooks?.capability?.getSnapshot())})`)

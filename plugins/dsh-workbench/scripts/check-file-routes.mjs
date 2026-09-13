@@ -82,11 +82,25 @@ function check(condition, message) {
 }
 
 /**
- * The newest Session directory DSH has on disk, with the workspace it was
- * opened in.
+ * The newest Session the workspace registry actually lists, with the workspace
+ * it was opened in.
+ *
+ * The registry is the authority here, not the newest directory on disk: the Host
+ * resolves its boundary from the Session's own header, so a Session the registry
+ * does not know — a subagent's, for one — would hand this script a workspace the
+ * route does not agree with, and every check would report a boundary refusal.
  * @returns {{ sessionId: string, cwd: string } | undefined}
  */
 function newestSession() {
+  // session id → workspace path, from the same registry the sidebar reads.
+  const workspaces = new Map()
+  try {
+    const registry = JSON.parse(readFileSync(join(homedir(), '.dsh', 'storages', 'workspace.json'), 'utf8'))
+    for (const row of Object.values(registry?.tables?.workspaces ?? {})) {
+      if (typeof row?.path !== 'string') continue
+      for (const id of row.sessionIds ?? []) workspaces.set(id, row.path)
+    }
+  } catch { return undefined }
   const root = join(homedir(), '.dsh', 'sessions')
   let best
   for (const project of readdirSync(root)) {
@@ -94,26 +108,17 @@ function newestSession() {
     let sessions
     try { sessions = readdirSync(projectDir) } catch { continue }
     for (const entry of sessions) {
-      const dir = join(projectDir, entry)
+      const cwd = workspaces.get(entry)
+      if (cwd === undefined) continue
       let info
-      try { info = statSync(dir) } catch { continue }
+      try { info = statSync(join(projectDir, entry)) } catch { continue }
       if (!info.isDirectory()) continue
       if (best === undefined || info.mtimeMs > best.mtimeMs) {
-        best = { sessionId: entry, mtimeMs: info.mtimeMs, dir }
+        best = { sessionId: entry, cwd, mtimeMs: info.mtimeMs }
       }
     }
   }
-  if (best === undefined) return undefined
-  // The project folder name is not a path; the workspace registry holds the
-  // real root, which is the same boundary the Host enforces.
-  let cwd
-  try {
-    const registry = JSON.parse(readFileSync(join(homedir(), '.dsh', 'storages', 'workspace.json'), 'utf8'))
-    const rows = Object.values(registry?.tables?.workspaces ?? {})
-    cwd = rows.find(row => Array.isArray(row?.sessionIds) && row.sessionIds.includes(best.sessionId))?.path
-      ?? rows[0]?.path
-  } catch { cwd = undefined }
-  return { sessionId: best.sessionId, cwd }
+  return best === undefined ? undefined : { sessionId: best.sessionId, cwd: best.cwd }
 }
 
 // The tokenized page sets the cookie the routes expect, and answers with a

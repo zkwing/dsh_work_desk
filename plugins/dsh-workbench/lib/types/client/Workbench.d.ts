@@ -1,5 +1,5 @@
 import type { InjectFace, PropsRuntime, SnapshotSelectorHook, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
-import { type AddOutcome, type CapabilitySource, type FileOpenOutcome, type PickerListing, type TreeLevel, type WorkspaceCardModel, type WorkspacesSnapshot } from './workspaces.ts';
+import { type AddOutcome, type CapabilitySource, type FileOpenOutcome, type PickerListing, type TreeLevel, type ValueSource, type WorkspaceCardModel, type WorkspacesSnapshot } from './workspaces.ts';
 /** The `workbench` namespace's translate function, bound by the plugin's apply. */
 export type WorkbenchTranslate = TranslateNS<'workbench'>;
 /** One directory level's outcome: the level model, ready or failed. */
@@ -35,9 +35,17 @@ export type MakeOutcome = {
 export interface WorkbenchInjected {
     /** The `workbench` namespace's translate function. */
     wt: WorkbenchTranslate;
-    /** Which optional capabilities are mounted, bound to `useCapability`. */
+    /**
+     * Live sources, which the framework binds into selector hooks.
+     *
+     * `capability` (→ `useCapability`) says what this composition mounts;
+     * `scheme` (→ `useScheme`) says whether the host palette is dark, which is
+     * what picks the background grid's color. Both are sources rather than values
+     * because an entry's inject face is built once and cached.
+     */
     hooks: {
         capability: CapabilitySource;
+        scheme: ValueSource<boolean>;
     };
     /**
      * Try the Host's OS chooser. A `browse` outcome means this composition serves
@@ -119,7 +127,7 @@ export declare function workspaceItems(snapshot: WorkspacesSnapshot | undefined)
  * @param props - the `main` runtime share (carrying `useWorkspaces`) plus this plugin's face.
  * @returns the panel element.
  */
-export declare function WorkbenchPanel({ wt: t, pickWorkspace, registerWorkspace, browseDirectory, makeDirectory, openFile, selectSession, showConversation, openWorkspace, startSession, removeWorkspace, listDirectory, useWorkspaces, useCapability, }: WorkbenchPanelProps): import("react").JSX.Element;
+export declare function WorkbenchPanel({ wt: t, pickWorkspace, registerWorkspace, browseDirectory, makeDirectory, openFile, selectSession, showConversation, openWorkspace, startSession, removeWorkspace, listDirectory, useWorkspaces, useCapability, useScheme, }: WorkbenchPanelProps): import("react").JSX.Element;
 /**
  * The sidebar panel-list glyph: one gauge, no interaction of its own.
  * @param props - the panel row's presentation share.

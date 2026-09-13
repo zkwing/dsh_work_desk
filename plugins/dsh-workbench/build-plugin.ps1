@@ -101,6 +101,7 @@ $tsconfig = @'
       "@deepseek-ai/dsh-api-workspace-controller/client": ["./../../api/workspace-controller/lib/types/client/index.d.ts"],
       "@deepseek-ai/dsh-api-workspace-files/remote": ["./../../api/workspace-files/lib/typert.remote-client.d.ts"],
       "@deepseek-ai/dsh-client-ui-sidebar-right/client": ["./../../client/ui-sidebar-right/lib/types/client/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-theme/client": ["./../../client/ui-theme/lib/types/client/index.d.ts"],
       "@deepseek-ai/dsh-session/types": ["./../../core/session/lib/types/types.d.ts"]
     }
   },

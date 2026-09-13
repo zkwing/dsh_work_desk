@@ -1,32 +1,62 @@
 /*
- * Workbench control room: a self-contained dark instrument surface the layout
- * hands the center column. It deliberately does not inherit the host page's
- * light/dark mode — the values below are local, and the conversation pane it
- * replaces stays untouched.
+ * Workbench control room: the instrument surface the layout hands the center
+ * column. It follows the host's palette — every surface, label, border, and
+ * accent below is a DSH alias token, so the panel is correct in the light
+ * palette, the dark palette, and under a registered third-party theme alike.
+ * The only color the tokens cannot express is the background grid, which is
+ * switched by `[data-wb-scheme]` on the panel root.
  *
  * Layout: the panel root fills its parent and stacks the head, the live reading
  * strip, the scrollable Workspace-card grid, and the foot. The `::before` layer
- * is the engineering grid behind that content.
+ * is the engineering grid behind that content, and the cards above it are
+ * frosted glass, so the grid reads through them.
  */
+
+/* ---- theme tokens (one home, shared with the portaled picker) ----
+ *
+ * Declared on `:root` rather than on the panel because the picker dialog is
+ * portaled to `document.body`, outside the panel subtree. Names are prefixed so
+ * a plugin-owned variable cannot collide with a host one, and every value falls
+ * back to a literal only for a host that defines no theme tokens at all.
+ */
+:root {
+  --wb-bg: var(--dsw-alias-bg-base, #0a0d14);
+  --wb-panel: var(--dsw-alias-bg-layer-1, #141822);
+  --wb-panel-solid: var(--dsw-alias-bg-layer-1, #141822);
+  --wb-raised: var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.04));
+  --wb-overlay: var(--dsw-alias-bg-overlay, #171b24);
+  --wb-line: var(--dsw-alias-border-l1, rgba(255, 255, 255, 0.1));
+  --wb-line-strong: var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.18));
+  --wb-text: var(--dsw-alias-label-primary, rgb(232, 236, 245));
+  --wb-text-dim: var(--dsw-alias-label-secondary, rgba(232, 236, 245, 0.62));
+  --wb-text-faint: color-mix(in srgb, var(--wb-text-dim) 62%, transparent);
+  --wb-accent: var(--dsw-alias-brand-primary, rgb(103, 158, 254));
+  --wb-danger: var(--dsw-alias-state-error-primary, rgb(228, 92, 92));
+  --wb-warn: var(--dsw-alias-state-warn-primary, rgb(224, 158, 54));
+  --wb-ok: var(--dsw-alias-state-success-primary, rgb(78, 209, 126));
+  /* Glass reads off the label color, so one recipe works in both palettes:
+     dark ink tints the glass in the light palette, light ink in the dark one. */
+  --wb-glass-tint: var(--wb-text);
+  --wb-glass-edge: color-mix(in srgb, var(--wb-text) 16%, transparent);
+  --wb-glass-sheen: color-mix(in srgb, var(--wb-text) 10%, transparent);
+  --wb-shadow: color-mix(in srgb, #000 30%, transparent);
+  /* The grid: white on the dark palette… */
+  --wb-grid-minor: rgba(255, 255, 255, 0.055);
+  --wb-grid-major: rgba(255, 255, 255, 0.11);
+  --wb-grid-cell: 16px;
+  --wb-grid-block: 80px;
+}
 
 /* ---- panel root (the center column's occupant) ---- */
 
 /*
  * The workbench is a global main panel, not an overlay: it fills the center
- * column the layout hands it and keeps its own dark instrument surface so it
- * reads as one control room regardless of the host's light/dark mode. The
- * `::before` layer is the faint engineering grid, masked away from the edges.
+ * column and wears the host's own canvas color, so switching panels does not
+ * change the page's tone. `color-scheme` is deliberately not set here — the
+ * layout's theme presenter owns it on `html`, and a local override would fight
+ * the native controls' palette.
  */
 .workbench {
-  --wb-bg: #0a0d14;
-  --wb-panel: rgba(19, 23, 33, 0.86);
-  --wb-panel-solid: #141822;
-  --wb-line: rgba(255, 255, 255, 0.08);
-  --wb-line-strong: rgba(255, 255, 255, 0.14);
-  --wb-text: rgb(232, 236, 245);
-  --wb-text-dim: rgba(232, 236, 245, 0.6);
-  --wb-text-faint: rgba(232, 236, 245, 0.38);
-  --wb-accent: rgb(103, 158, 254);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -36,22 +66,38 @@
   overflow: hidden;
   box-sizing: border-box;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 18%),
-    var(--wb-panel-solid);
-  color-scheme: dark;
+    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--wb-accent) 8%, transparent), transparent 70%),
+    var(--wb-bg);
 }
 
+/* …gold on the light palette: the attribute the panel root carries. */
+.workbench[data-wb-scheme='light'] {
+  --wb-grid-minor: rgba(176, 128, 24, 0.14);
+  --wb-grid-major: rgba(176, 128, 24, 0.3);
+}
+
+/*
+ * The engineering grid: a fine cell plus a coarser block, drawn on one masked
+ * layer behind the content. The mask only softens the far edge — the lines are
+ * meant to be seen, and the frosted cards are meant to show them through.
+ */
 .workbench::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
-  background-size: 32px 32px, 32px 32px;
-  mask-image: radial-gradient(120% 80% at 50% -10%, #000 20%, transparent 78%);
-  -webkit-mask-image: radial-gradient(120% 80% at 50% -10%, #000 20%, transparent 78%);
+    linear-gradient(var(--wb-grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--wb-grid-minor) 1px, transparent 1px),
+    linear-gradient(var(--wb-grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--wb-grid-major) 1px, transparent 1px);
+  background-size:
+    var(--wb-grid-cell) var(--wb-grid-cell),
+    var(--wb-grid-cell) var(--wb-grid-cell),
+    var(--wb-grid-block) var(--wb-grid-block),
+    var(--wb-grid-block) var(--wb-grid-block);
+  mask-image: radial-gradient(130% 100% at 50% 0%, #000 55%, transparent 100%);
+  -webkit-mask-image: radial-gradient(130% 100% at 50% 0%, #000 55%, transparent 100%);
 }
 
 /* A capability this composition does not mount: stated, never silent. */
@@ -60,8 +106,8 @@
   margin: 0;
   padding: 10px 20px;
   border-bottom: 1px solid var(--wb-line);
-  background: rgba(247, 173, 49, 0.1);
-  color: rgb(247, 196, 120);
+  background: color-mix(in srgb, var(--wb-warn) 14%, transparent);
+  color: var(--wb-warn);
   font-size: 12px;
 }
 
@@ -73,9 +119,9 @@
   gap: 10px;
   margin: 0;
   padding: 10px 14px 10px 20px;
-  border-bottom: 1px solid rgba(244, 114, 182, 0.3);
-  background: rgba(244, 114, 182, 0.12);
-  color: rgb(247, 175, 211);
+  border-bottom: 1px solid color-mix(in srgb, var(--wb-danger) 32%, transparent);
+  background: color-mix(in srgb, var(--wb-danger) 14%, transparent);
+  color: var(--wb-danger);
   font-size: 12px;
 }
 
@@ -89,7 +135,7 @@
   width: 22px;
   height: 22px;
   padding: 0;
-  border: 1px solid rgba(247, 175, 211, 0.35);
+  border: 1px solid color-mix(in srgb, var(--wb-danger) 38%, transparent);
   border-radius: 6px;
   background: transparent;
   color: inherit;
@@ -100,7 +146,7 @@
 }
 
 .noticeClose:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--wb-glass-tint) 13%, transparent);
 }
 
 /* ---- head ---- */
@@ -131,9 +177,9 @@
   flex: none;
   border: 1px solid var(--wb-line-strong);
   border-radius: 12px;
-  background: linear-gradient(150deg, rgba(103, 158, 254, 0.28), rgba(103, 158, 254, 0.04));
-  color: rgb(183, 200, 254);
-  box-shadow: 0 0 24px rgba(86, 134, 254, 0.24);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--wb-accent) 30%, transparent), color-mix(in srgb, var(--wb-accent) 5%, transparent));
+  color: color-mix(in srgb, var(--wb-accent) 62%, var(--wb-text));
+  box-shadow: 0 0 24px color-mix(in srgb, var(--wb-accent) 26%, transparent);
 }
 
 .headText {
@@ -168,10 +214,10 @@
   height: 28px;
   padding: 0 10px;
   box-sizing: border-box;
-  border: 1px solid rgba(78, 209, 126, 0.28);
+  border: 1px solid color-mix(in srgb, var(--wb-ok) 34%, transparent);
   border-radius: 999px;
-  background: rgba(78, 209, 126, 0.08);
-  color: rgb(160, 231, 186);
+  background: color-mix(in srgb, var(--wb-ok) 12%, transparent);
+  color: var(--wb-ok);
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -181,8 +227,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgb(78, 209, 126);
-  box-shadow: 0 0 10px rgba(78, 209, 126, 0.9);
+  background: var(--wb-ok);
+  box-shadow: 0 0 10px var(--wb-ok);
   animation: wbPulse 2s ease-in-out infinite;
 }
 
@@ -195,7 +241,7 @@
   box-sizing: border-box;
   border: 1px solid var(--wb-line-strong);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.04);
+  background: color-mix(in srgb, var(--wb-glass-tint) 5%, transparent);
   color: var(--wb-text);
   font: inherit;
   font-size: 12px;
@@ -204,8 +250,8 @@
 }
 
 .action:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--wb-glass-tint) 10%, transparent);
+  border-color: color-mix(in srgb, var(--wb-glass-tint) 22%, transparent);
 }
 
 .action:focus-visible {
@@ -230,7 +276,7 @@
 }
 
 .iconOnly:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--wb-glass-tint) 9%, transparent);
   color: var(--wb-text);
 }
 
@@ -252,7 +298,7 @@
   padding: 12px 14px;
   border: 1px solid var(--wb-line);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--wb-glass-tint) 6%, transparent), color-mix(in srgb, var(--wb-glass-tint) 2%, transparent));
 }
 
 .readingLabel {
@@ -288,7 +334,7 @@
   gap: 14px;
   padding: 18px 20px 22px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent) transparent;
 }
 
 .projects::-webkit-scrollbar {
@@ -299,40 +345,83 @@
   border: 3px solid transparent;
   border-radius: 8px;
   background-clip: content-box;
-  background-color: rgba(255, 255, 255, 0.16);
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent);
 }
 
+/*
+ * The card is a sheet of frosted glass: a translucent layer over the panel's
+ * grid, blurred and saturated so what is behind it smears (that is the
+ * "liquid" part), a bright rim on the lit edge, a shadow pooling underneath,
+ * and a slow specular sheen that slides across on hover. Everything is mixed
+ * from `--wb-text`, so one recipe produces dark-tinted glass in the light
+ * palette and light-tinted glass in the dark one.
+ */
 .card {
-  --card-accent: rgb(103, 158, 254);
+  --card-accent: var(--wb-accent);
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 14px 14px 12px;
-  border: 1px solid var(--wb-line);
-  border-radius: 16px;
+  border: 1px solid var(--wb-glass-edge);
+  border-top-color: color-mix(in srgb, var(--wb-glass-tint) 26%, transparent);
+  border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012)),
-    rgba(255, 255, 255, 0.012);
+    linear-gradient(158deg,
+      color-mix(in srgb, var(--wb-glass-tint) 9%, transparent) 0%,
+      color-mix(in srgb, var(--wb-glass-tint) 3%, transparent) 40%,
+      color-mix(in srgb, var(--wb-glass-tint) 1%, transparent) 100%),
+    color-mix(in srgb, var(--wb-panel) 38%, transparent);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
+    0 10px 28px var(--wb-shadow);
   overflow: hidden;
-  transition: transform 0.18s var(--ds-ease-in-out), border-color 0.18s var(--ds-ease-in-out),
-    box-shadow 0.18s var(--ds-ease-in-out);
+  transition: transform 0.22s var(--ds-ease-in-out), border-color 0.22s var(--ds-ease-in-out),
+    box-shadow 0.22s var(--ds-ease-in-out);
 }
 
-/* Accent rail: the card's identity stripe, colored by its accent key. */
+/* The specular sheen: a diagonal band of light that drifts on hover. */
+.card::after {
+  content: '';
+  position: absolute;
+  inset: -40% -10%;
+  pointer-events: none;
+  background: linear-gradient(112deg,
+    transparent 34%,
+    color-mix(in srgb, var(--wb-glass-tint) 12%, transparent) 47%,
+    color-mix(in srgb, var(--wb-glass-tint) 4%, transparent) 53%,
+    transparent 66%);
+  transform: translateX(-14%);
+  opacity: 0.75;
+  transition: transform 0.6s var(--ds-ease-in-out), opacity 0.6s var(--ds-ease-in-out);
+}
+
+/* Accent rail: the card's identity edge, glowing in the card's own accent. */
 .card::before {
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
   width: 3px;
+  z-index: 1;
   background: linear-gradient(180deg, var(--card-accent), transparent 85%);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--card-accent) 70%, transparent);
   opacity: 0.9;
 }
 
 .card:hover {
   transform: translateY(-2px);
-  border-color: var(--wb-line-strong);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.42);
+  border-color: color-mix(in srgb, var(--wb-glass-tint) 24%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 30%, transparent),
+    0 18px 44px color-mix(in srgb, #000 38%, transparent);
+}
+
+.card:hover::after {
+  transform: translateX(12%);
+  opacity: 1;
 }
 
 /*
@@ -375,7 +464,7 @@
 }
 
 .cardOpen:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--wb-glass-tint) 7%, transparent);
 }
 
 .cardOpen:disabled {
@@ -417,7 +506,7 @@
   padding: 2px;
   border: 1px solid var(--wb-line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--wb-glass-tint) 4%, transparent);
 }
 
 .faceChip {
@@ -451,7 +540,7 @@
   font-family: var(--ds-font-family-code);
   font-size: 11.5px;
   letter-spacing: -0.01em;
-  color: rgba(183, 200, 254, 0.82);
+  color: color-mix(in srgb, var(--wb-accent) 55%, var(--wb-text));
 }
 
 /* Conversation face: the Session count and the open/start action. */
@@ -464,7 +553,7 @@
   padding: 10px 12px;
   border: 1px solid var(--wb-line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.018);
+  background: color-mix(in srgb, var(--wb-glass-tint) 3%, transparent);
 }
 
 .metaRow {
@@ -508,7 +597,7 @@
   min-height: 0;
   border: 1px solid var(--wb-line);
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.2);
+  background: color-mix(in srgb, #000 14%, transparent);
   overflow: hidden;
 }
 
@@ -520,7 +609,7 @@
   height: 26px;
   padding: 0 6px 0 4px;
   border-bottom: 1px solid var(--wb-line);
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--wb-glass-tint) 4%, transparent);
 }
 
 .explorerCaret {
@@ -573,7 +662,7 @@
 }
 
 .explorerTool:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--wb-glass-tint) 11%, transparent);
   color: var(--wb-text);
 }
 
@@ -598,7 +687,7 @@
   list-style: none;
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent) transparent;
 }
 
 .explorerRows::-webkit-scrollbar {
@@ -609,7 +698,7 @@
   border: 3px solid transparent;
   border-radius: 8px;
   background-clip: content-box;
-  background-color: rgba(255, 255, 255, 0.16);
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent);
 }
 
 .explorerItem {
@@ -637,16 +726,16 @@
 
 /* VS Code's hover band, then its focus band: hover is lighter than selection. */
 .explorerRow:hover {
-  background: rgba(255, 255, 255, 0.055);
+  background: color-mix(in srgb, var(--wb-glass-tint) 6%, transparent);
 }
 
 .explorerRowSelected {
-  background: rgba(103, 158, 254, 0.16);
+  background: color-mix(in srgb, var(--wb-accent) 20%, transparent);
   box-shadow: inset 2px 0 0 var(--wb-accent);
 }
 
 .explorerRowSelected:hover {
-  background: rgba(103, 158, 254, 0.22);
+  background: color-mix(in srgb, var(--wb-accent) 24%, transparent);
 }
 
 /* One indent guide per ancestor level, drawn on the row's own backdrop. */
@@ -654,7 +743,7 @@
   flex: none;
   width: 14px;
   align-self: stretch;
-  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.11) 0 1px, transparent 1px);
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--wb-text) 12%, transparent) 0 1px, transparent 1px);
   background-repeat: no-repeat;
 }
 
@@ -677,7 +766,7 @@
   justify-content: center;
   flex: none;
   width: 18px;
-  color: rgb(140, 168, 214);
+  color: color-mix(in srgb, var(--wb-accent) 42%, var(--wb-text-dim));
 }
 
 .explorerRow[data-explorer-kind='file'] .explorerIcon {
@@ -723,7 +812,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgb(244, 154, 194);
+  color: var(--wb-danger);
 }
 
 .explorerRetry {
@@ -740,7 +829,7 @@
 }
 
 .explorerRetry:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--wb-glass-tint) 11%, transparent);
 }
 
 .explorerSpin {
@@ -769,22 +858,15 @@
 
 /* ---- the in-app directory picker ----
  *
- * The picker is a body-portaled Modal, so the panel's token block does not
- * cascade into it: this class restates the same values on the dialog element.
- * Everything inside is styled from them, which keeps the dialog looking like
- * part of the control room instead of like the host page's theme.
+ * The picker is a body-portaled Modal, so it sits outside the panel subtree —
+ * which is why the tokens live on `:root` (above) rather than on `.workbench`:
+ * the dialog inherits them from the document, exactly like the panel does. Only
+ * the dialog's own geometry is set here.
  */
 
 .picker {
-  --wb-line: rgba(255, 255, 255, 0.08);
-  --wb-line-strong: rgba(255, 255, 255, 0.14);
-  --wb-text: rgb(232, 236, 245);
-  --wb-text-dim: rgba(232, 236, 245, 0.6);
-  --wb-text-faint: rgba(232, 236, 245, 0.38);
-  --wb-accent: rgb(103, 158, 254);
   width: min(560px, 92vw);
   color: var(--wb-text);
-  color-scheme: dark;
 }
 
 .pickerContent {
@@ -827,7 +909,7 @@
 }
 
 .pickerCrumb:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--wb-glass-tint) 9%, transparent);
   color: var(--wb-text);
 }
 
@@ -867,7 +949,7 @@
   white-space: nowrap;
   font-family: var(--ds-font-family-code);
   font-size: 11.5px;
-  color: rgba(183, 200, 254, 0.82);
+  color: color-mix(in srgb, var(--wb-accent) 55%, var(--wb-text));
 }
 
 .pickerToggle {
@@ -896,7 +978,7 @@
 }
 
 .pickerTool:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--wb-glass-tint) 11%, transparent);
   color: var(--wb-text);
 }
 
@@ -915,10 +997,10 @@
 .pickerNotice {
   margin: 0 0 8px;
   padding: 6px 8px;
-  border: 1px solid rgba(244, 114, 182, 0.3);
+  border: 1px solid color-mix(in srgb, var(--wb-danger) 32%, transparent);
   border-radius: 8px;
-  background: rgba(244, 114, 182, 0.12);
-  color: rgb(247, 175, 211);
+  background: color-mix(in srgb, var(--wb-danger) 14%, transparent);
+  color: var(--wb-danger);
   font-size: 11.5px;
 }
 
@@ -929,9 +1011,9 @@
   padding: 4px 0;
   border: 1px solid var(--wb-line);
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.24);
+  background: color-mix(in srgb, #000 16%, transparent);
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent) transparent;
 }
 
 .pickerRows::-webkit-scrollbar {
@@ -942,7 +1024,7 @@
   border: 3px solid transparent;
   border-radius: 8px;
   background-clip: content-box;
-  background-color: rgba(255, 255, 255, 0.16);
+  background-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent);
 }
 
 .pickerRow {
@@ -964,7 +1046,7 @@
 }
 
 .pickerRow:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--wb-glass-tint) 7%, transparent);
 }
 
 .pickerNote {
@@ -999,7 +1081,7 @@
   gap: 6px;
   flex: none;
   padding: 6px 8px;
-  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.24));
+  border-bottom: 1px solid var(--dsw-alias-border-l2, var(--wb-line));
 }
 
 .editorName {
@@ -1013,7 +1095,7 @@
 
 .editorDirty {
   flex: none;
-  color: var(--dsw-alias-text-warning, #d98c1f);
+  color: var(--wb-warn);
   font-size: 10px;
 }
 
@@ -1034,8 +1116,8 @@
   flex: none;
   margin: 0;
   padding: 6px 10px;
-  background: rgba(217, 140, 31, 0.14);
-  color: var(--dsw-alias-text-warning, #a8640f);
+  background: color-mix(in srgb, var(--wb-warn) 16%, transparent);
+  color: var(--wb-warn);
   font-size: 11.5px;
 }
 
@@ -1052,7 +1134,7 @@
 
 .editorFailed {
   margin: 0;
-  color: var(--dsw-alias-text-danger, #d9483b);
+  color: var(--wb-danger);
 }
 
 /* The body scrolls as one surface: gutter and text share the same scroll box,
@@ -1115,7 +1197,7 @@
   gap: 8px;
   flex: none;
   padding: 6px 8px;
-  border-top: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.24));
+  border-top: 1px solid var(--dsw-alias-border-l2, var(--wb-line));
 }
 
 .editorHint {
@@ -1158,8 +1240,10 @@
   min-height: 190px;
   padding: 18px;
   border: 1px dashed var(--wb-line-strong);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.012);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--wb-glass-tint) 3%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
   color: var(--wb-text-dim);
   font: inherit;
   cursor: pointer;
@@ -1169,8 +1253,8 @@
 
 .addCard:hover:not(:disabled) {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, rgb(103, 158, 254) 60%, transparent);
-  background: rgba(103, 158, 254, 0.06);
+  border-color: color-mix(in srgb, var(--wb-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--wb-accent) 8%, transparent);
 }
 
 .addCard:disabled {
@@ -1186,8 +1270,8 @@
   height: 44px;
   border: 1px solid var(--wb-line-strong);
   border-radius: 14px;
-  background: linear-gradient(150deg, rgba(103, 158, 254, 0.22), transparent);
-  color: rgb(183, 200, 254);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--wb-accent) 24%, transparent), transparent);
+  color: color-mix(in srgb, var(--wb-accent) 62%, var(--wb-text));
 }
 
 .addTitle {
@@ -1207,7 +1291,7 @@
 .accent_violet { --card-accent: rgb(167, 139, 250); }
 .accent_amber { --card-accent: rgb(247, 173, 49); }
 .accent_emerald { --card-accent: rgb(78, 209, 126); }
-.accent_rose { --card-accent: rgb(244, 114, 182); }
+.accent_rose { --card-accent: var(--wb-danger); }
 .accent_slate { --card-accent: rgb(151, 157, 166); }
 
 /* ---- empty state ---- */
@@ -1221,8 +1305,10 @@
   gap: 8px;
   padding: 56px 24px;
   border: 1px dashed var(--wb-line-strong);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.014);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--wb-glass-tint) 3%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
   text-align: center;
 }
 
@@ -1234,8 +1320,8 @@
   height: 46px;
   border: 1px solid var(--wb-line-strong);
   border-radius: 14px;
-  background: linear-gradient(150deg, rgba(103, 158, 254, 0.22), transparent);
-  color: rgb(183, 200, 254);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--wb-accent) 24%, transparent), transparent);
+  color: color-mix(in srgb, var(--wb-accent) 62%, var(--wb-text));
 }
 
 .emptyTitle {
@@ -1259,7 +1345,7 @@
   justify-content: space-between;
   padding: 10px 20px;
   border-top: 1px solid var(--wb-line);
-  background: rgba(0, 0, 0, 0.22);
+  background: color-mix(in srgb, #000 12%, transparent);
 }
 
 .footHint {

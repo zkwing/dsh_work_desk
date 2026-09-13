@@ -111,6 +111,35 @@ export interface CapabilityStore extends CapabilitySource {
      */
     set(patch: Partial<Capabilities>): void;
 }
+/** A live value a Slot component subscribes to; structurally the framework's source. */
+export interface ValueSource<T> {
+    /** Read the cached value (stable between notifications). */
+    getSnapshot(): T;
+    /**
+     * Subscribe to invalidation.
+     * @param listener - invalidation callback.
+     * @returns unsubscribe function.
+     */
+    subscribe(listener: () => void): () => void;
+}
+/** A value source plus its one writer. */
+export interface ValueStore<T> extends ValueSource<T> {
+    /**
+     * Replace the value and notify only when it actually changed.
+     * @param value - the new value.
+     */
+    set(value: T): void;
+}
+/**
+ * Create a minimal observable value for a registration's `hooks` compartment.
+ *
+ * The slot framework binds such a source into a selector hook, which is how a
+ * value the plugin cannot re-register for — the color scheme, say — still
+ * re-renders the panel.
+ * @param initial - the first value.
+ * @returns the source and its writer.
+ */
+export declare function createValueStore<T>(initial: T): ValueStore<T>;
 /**
  * Create the panel's capability source. It is a plain observable rather than a
  * React state so the registrant can hand it to the slot as a `hooks` source:

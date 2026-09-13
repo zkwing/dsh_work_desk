@@ -127,6 +127,8 @@ check(batchBody.includes('workbench-editor') && batchBody.includes('/workbench/f
   'the served bundle carries the editor tab type and this plugin\'s write route')
 check(batchBody.includes('selectPanel'),
   'the served bundle hands the center column over (the right column only exists in the conversation view)')
+check(batchBody.includes('--dsw-alias-bg-base') && batchBody.includes('data-wb-scheme'),
+  'the served stylesheet follows the host palette and switches its grid by color scheme')
 check(batchBody.includes('@deepseek-ai/dsh-client-ui-sidebar'),
   'the official sidebar is composed in the same graph as the workbench')
 

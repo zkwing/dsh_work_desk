@@ -43,6 +43,26 @@ bind host / SSH / 显示会话解析一次，Desktop 那次解析落在 browse�
                        └─┴─────────────────────────────────────┴─┴────────┘
 ```
 
+## 视觉与主题
+
+面板**跟随 DSH 主题**：底色、卡片、文字、边框、强调色、状态色全部取自宿主别名 token
+（`--dsw-alias-bg-base` / `-bg-layer-1|2` / `-bg-overlay` / `-border-l1|l2` / `-label-primary|secondary` /
+`-brand-primary` / `-state-*-primary`），token 统一声明在 `:root`（这样 portaled 的选择器对话框也继承到），
+所以浅色、深色、以及注册进来的第三方主题都对。面板自己**不再**声明 `color-scheme`
+——那是布局的 theme presenter 在 `html` 上的职责。
+
+卡片是**液晶玻璃**：半透明层 + `backdrop-filter: blur(22px) saturate(180%)`，
+亮边（`border-top-color` 提亮）、内侧高光与下沉阴影，加一道斜向镜面高光，
+hover 时高光缓慢扫过并轻微上浮。玻璃的色调从 `--wb-glass-tint`（= 当前文字色）混合而来，
+所以一套配方在两种配色下都成立：浅色下是深色墨染玻璃，深色下是浅色雾面玻璃。
+
+背景网格由 `::before` 一层四条渐变画成：**16px 细格 + 80px 粗格**（比早先的 32px 密），
+按配色换色——**深色背景用白色**（`#ffffff0e` / `#ffffff1c`），
+**浅色背景用金色**（`#b0801824` / `#b080184d`，即 `rgb(176,128,24)`）。
+换色的判据来自 `ctx.theme` 的 `active.colorScheme`，通过注册的 `hooks.scheme`
+绑定成 `useScheme` 选择器 hook，面板根上落 `data-wb-scheme`，样式表据此切换；
+`theme/change` 事件会实时翻转它。
+
 ## 四条硬约束
 
 这个面板**不覆盖**会话：它占中列，和「工作区」及其他全局面板一样由布局切换，
@@ -216,7 +236,7 @@ dsh plugin --profile web add github:<you>/dsh-workbench
 
 | 层 | 命令 | 覆盖 |
 | --- | --- | --- |
-| 产物契约 | `node scripts/verify-artifact.mjs` | 134 项：模块表握手、纯注册（不碰模块表）、注册 id、导出面、`inject` 面、外部请求全在平台基线内、字典、四次注册、label thunk、注入面、disposer、能力源、业务面、资源地址文法、编辑器页签、**编辑器的读写线形**、**右侧栏缺座位时的分类与修复**、**晚到能力**、资源管理器行模型与地址栏上溯、**添加流程分支表**、降级装配 |
+| 产物契约 | `node scripts/verify-artifact.mjs` | 140 项：模块表握手、纯注册（不碰模块表）、注册 id、导出面、`inject` 面、外部请求全在平台基线内、字典、四次注册、label thunk、注入面、disposer、能力源与**配色方案源**、业务面、资源地址文法、编辑器页签、**编辑器的读写线形**、**右侧栏缺座位时的分类与修复**、**晚到能力**、资源管理器行模型与地址栏上溯、**添加流程分支表**、降级装配 |
 | profile 解析 | `node scripts/check-resolution.mjs %USERPROFILE%\.dsh\profiles\web dsh-workbench` | Loader 的 bare-name 解析、Host 半可加载、`dsh.bundle`/`dsh.client` 声明、client bundle 存在 |
 | **真实 Host 上线** | `node scripts/check-live-host.mjs http://127.0.0.1:43299 dsh-workbench <token>` | 跑起来的 `dsh web` 是否把插件端到端送到浏览器，以及这次启动组的是哪种目录选择交互 |
 | **文件路由实测** | `node scripts/check-file-routes.mjs http://127.0.0.1:43299 <token>` | 真的在磁盘上读写一个文件：信任栅栏、只改已存在文件、版本守卫、`stale` 拒写、越界拒写、方法/媒体类型 |
@@ -273,7 +293,7 @@ OK  the running Host serves this plugin to the browser
 ```
 loader handshake      ok ×4
 client face           ok ×9
-host registration     ok ×32   (字典 + 四次注册 + 十个注入面 + 能力源 + 编辑器页签)
+host registration     ok ×32   (字典 + 四次注册 + 十个注入面 + 能力源与配色源 + 编辑器页签)
 workspace faces       ok ×12   (两条添加路径 + 拒绝上报 + 浏览原语)
 file open             ok ×14   (地址文法 + 默认走编辑器 + 缺座位分类 + 会话补位)
 editor routes         ok ×13   (客户端到自建 Host 路由的线形与分类)
@@ -281,7 +301,7 @@ late capability       ok ×12   (apply 之后才挂上的服务照样到达面�
 explorer model        ok ×16   (行序、层级、展开、空/失败/截断、路径拆分与上溯)
 pick flow             ok ×10   (分支表、面包屑、隐藏目录过滤)
 degraded composition  ok ×12   (什么都没挂时仍挂载，报错有内容而不是静默)
-共 134 项；OK  the artifact satisfies the DSH client-module contract
+共 140 项；OK  the artifact satisfies the DSH client-module contract
 
 resolved host entry: D:\3_WorkProject\work_desk\plugins\dsh-workbench\lib\index.js
 declares dsh.bundle.patch: ./cordis.patch.yml

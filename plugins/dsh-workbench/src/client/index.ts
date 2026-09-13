@@ -51,6 +51,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { ISidebarRight } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
+// Type-only: the theme service and its `theme/change` event merge. The panel
+// follows the host palette through CSS variables, but switching the *grid*
+// between white and gold needs the resolved color scheme, which is this
+// service's fact rather than the stylesheet's.
+import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type {} from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -66,7 +71,7 @@ import {
   type EditorInjected, type EditorReadOutcome, type EditorWriteOutcome,
 } from './WorkbenchFileEditor.js'
 import {
-  createCapabilityStore, failureText, fileAddress, pickStep,
+  createCapabilityStore, createValueStore, failureText, fileAddress, pickStep,
   type AddOutcome, type Capabilities, type FileOpenOutcome, type PickReply, type PickerListing, type TreeEntry,
 } from './workspaces.js'
 import { en, zh, type WorkbenchKey } from './locales.js'
@@ -251,6 +256,12 @@ interface SessionsFace {
   open(sessionId: string): void
 }
 
+/** The theme service `ui-theme` provides (`ctx.theme`), narrowed to the read this plugin makes. */
+interface ThemeFace {
+  /** @returns the current immutable snapshot, stable until the next change. */
+  getTheme(): ThemeSnapshot
+}
+
 /**
  * Register the workbench's dictionaries, its sidebar panel row, and its main
  * panel body.
@@ -296,6 +307,21 @@ export function apply(ctx: ClientContext): void {
   watch('remote.workspaceFiles', { files: true }, { files: false })
   watch('remote.directoryPicker', { picker: true }, { picker: false })
   watch('sidebarRight', { pane: true }, { pane: false })
+
+  // The color scheme, as a live source for the panel. Every surface and label
+  // in this panel's stylesheet comes from the host's `--dsw-*` alias tokens, so
+  // the palette follows the theme on its own; the scheme is needed for the one
+  // thing tokens cannot express — the background grid, which is white on a dark
+  // palette and gold on a light one. Absent a theme service the panel starts on
+  // the dark palette, which is the palette every DSH surface ships first.
+  const themeService = service<ThemeFace>(ctx, 'theme')
+  const scheme = createValueStore(themeService?.getTheme().active.colorScheme === 'dark')
+  ctx.effect(() => {
+    const off = ctx.on('theme/change', (snapshot: ThemeSnapshot) => {
+      scheme.set(snapshot.active.colorScheme === 'dark')
+    })
+    return () => { off() }
+  }, 'dsh-workbench: color scheme')
 
   // Every action resolves its services at call time for the same reason the
   // flags are live, so a control that the flags enable is never a stale
@@ -574,7 +600,7 @@ export function apply(ctx: ClientContext): void {
 
   const injected = (): WorkbenchInjected => ({
     wt: workbenchT,
-    hooks: { capability },
+    hooks: { capability, scheme },
     pickWorkspace,
     registerWorkspace,
     browseDirectory,

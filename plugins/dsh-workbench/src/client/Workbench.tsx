@@ -32,7 +32,8 @@ import type { CardFace } from './cards.ts'
 import {
   accentFor, explorerRows, sizeText, splitPath,
   type AddOutcome, type Capabilities, type CapabilitySource, type CardAccent, type ExplorerRow,
-  type FileOpenOutcome, type PickerListing, type TreeLevel, type WorkspaceCardModel, type WorkspacesSnapshot,
+  type FileOpenOutcome, type PickerListing, type TreeLevel, type ValueSource, type WorkspaceCardModel,
+  type WorkspacesSnapshot,
 } from './workspaces.ts'
 import { WorkspaceDirectoryPicker } from './WorkspaceDirectoryPicker.tsx'
 import css from './Workbench.module.css'
@@ -65,8 +66,15 @@ export type MakeOutcome =
 export interface WorkbenchInjected {
   /** The `workbench` namespace's translate function. */
   wt: WorkbenchTranslate
-  /** Which optional capabilities are mounted, bound to `useCapability`. */
-  hooks: { capability: CapabilitySource }
+  /**
+   * Live sources, which the framework binds into selector hooks.
+   *
+   * `capability` (→ `useCapability`) says what this composition mounts;
+   * `scheme` (→ `useScheme`) says whether the host palette is dark, which is
+   * what picks the background grid's color. Both are sources rather than values
+   * because an entry's inject face is built once and cached.
+   */
+  hooks: { capability: CapabilitySource; scheme: ValueSource<boolean> }
   /**
    * Try the Host's OS chooser. A `browse` outcome means this composition serves
    * the in-app picker instead — a fork in the flow, not a failure.
@@ -603,9 +611,11 @@ export function WorkbenchPanel({
   listDirectory,
   useWorkspaces,
   useCapability,
+  useScheme,
 }: WorkbenchPanelProps) {
   const [adding, setAdding] = useState(false)
   const [picking, setPicking] = useState(false)
+  const dark = useScheme(darkPalette => darkPalette)
   // The notice names the gesture that failed, not a fixed one: a file that will
   // not open must not read as "could not add the workspace".
   const [error, setError] = useState<{ label: string; message: string } | undefined>(undefined)
@@ -717,7 +727,15 @@ export function WorkbenchPanel({
   }, [workspaces, now, t])
 
   return (
-    <div className={css.workbench} role="region" aria-label={t('title')}>
+    <div
+      className={css.workbench}
+      role="region"
+      aria-label={t('title')}
+      /* The grid's color is the one thing the host tokens cannot express:
+         white lines on a dark palette, gold ones on a light palette. The
+         attribute is what the stylesheet switches on. */
+      data-wb-scheme={dark ? 'dark' : 'light'}
+    >
       <header className={css.panelHead}>
         <div className={css.headIdentity}>
           <span className={css.headGlyph} aria-hidden="true"><IconGaugeOutline16 size={18} /></span>
