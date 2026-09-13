@@ -75,7 +75,7 @@ export interface WorkbenchInjected {
      */
     showConversation: () => boolean;
     /** Open a Workspace's Conversation in the center column. */
-    openWorkspace: (workspaceId: string) => void;
+    openWorkspace: (workspaceId: string) => Promise<void>;
     /** Start a New Session inside a Workspace. */
     startSession: (workspaceId: string) => void;
     /** Drop a Workspace registration. */
@@ -127,7 +127,7 @@ export declare function workspaceItems(snapshot: WorkspacesSnapshot | undefined)
  * @param props - the `main` runtime share (carrying `useWorkspaces`) plus this plugin's face.
  * @returns the panel element.
  */
-export declare function WorkbenchPanel({ wt: t, pickWorkspace, registerWorkspace, browseDirectory, makeDirectory, openFile, selectSession, showConversation, openWorkspace, startSession, removeWorkspace, listDirectory, useWorkspaces, useCapability, useScheme, }: WorkbenchPanelProps): import("react").JSX.Element;
+export declare function WorkbenchPanel({ wt: t, pickWorkspace, registerWorkspace, browseDirectory, makeDirectory, openFile, selectSession, showConversation, openWorkspace, removeWorkspace, listDirectory, useWorkspaces, useCapability, useScheme, }: WorkbenchPanelProps): import("react").JSX.Element;
 /**
  * The sidebar panel-list glyph: one gauge, no interaction of its own.
  * @param props - the panel row's presentation share.

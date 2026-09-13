@@ -406,10 +406,10 @@ export function apply(ctx: ClientContext): void {
     }
   }
 
-  const openWorkspace = (workspaceId: string): void => {
+  const openWorkspace = (workspaceId: string): Promise<void> => {
     const navigation = service<UiWorkspaceFace>(ctx, 'uiWorkspace')
-    if (navigation === undefined) return
-    void navigation.openWorkspace(workspaceId)
+    if (navigation === undefined) return Promise.resolve()
+    return navigation.openWorkspace(workspaceId)
   }
 
   const startSession = (workspaceId: string): void => {

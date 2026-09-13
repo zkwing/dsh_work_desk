@@ -28,13 +28,13 @@ import {
 import type {
   InjectFace, PropsRuntime, SnapshotSelectorHook, TranslateNS,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import type { CardFace } from './cards.ts'
 import {
   accentFor, explorerRows, sizeText, splitPath,
   type AddOutcome, type Capabilities, type CapabilitySource, type CardAccent, type ExplorerRow,
   type FileOpenOutcome, type PickerListing, type TreeLevel, type ValueSource, type WorkspaceCardModel,
   type WorkspacesSnapshot,
 } from './workspaces.ts'
+import type { CardStatus } from './cards.ts'
 import { WorkspaceDirectoryPicker } from './WorkspaceDirectoryPicker.tsx'
 import css from './Workbench.module.css'
 
@@ -103,7 +103,7 @@ export interface WorkbenchInjected {
    */
   showConversation: () => boolean
   /** Open a Workspace's Conversation in the center column. */
-  openWorkspace: (workspaceId: string) => void
+  openWorkspace: (workspaceId: string) => Promise<void>
   /** Start a New Session inside a Workspace. */
   startSession: (workspaceId: string) => void
   /** Drop a Workspace registration. */
@@ -470,10 +470,10 @@ const NO_WORKSPACES = ((selector: (state: WorkspacesSnapshot) => unknown) =>
   selector({ items: [], archivedSessionIds: [] })) as SnapshotSelectorHook<WorkspacesSnapshot>
 
 /**
- * One Workspace card: its identity, a Conversation/Files switch, and whichever
- * face is selected.
+ * One Workspace card: its identity button, the Workspace path, and a file
+ * explorer rooted at that path.
  *
- * The Files face browses the Workspace's own path through the first Session
+ * The explorer browses the Workspace's own path through the first Session
  * accounted to it, because the Host confines a listing to that Session's
  * workspace root, and a file opens in the right column the way the official
  * file tree opens it. Which controls appear is the capability snapshot's call,
@@ -483,25 +483,56 @@ const NO_WORKSPACES = ((selector: (state: WorkspacesSnapshot) => unknown) =>
  * @returns the card element.
  */
 function WorkspaceCard({
-  workspace, index, t, capability, listDirectory, onOpen, onStart, onRemove, onOpenFile,
+  workspace, index, t, capability, listDirectory, onOpen, onRemove, onOpenFile,
 }: {
   workspace: WorkspaceCardModel
   index: number
   t: WorkbenchTranslate
   capability: Capabilities
   listDirectory: WorkbenchPanelProps['listDirectory']
-  onOpen: () => void
-  onStart: () => void
+  onOpen: () => Promise<void>
   onRemove: () => void
   onOpenFile: (path: string) => void
 }) {
-  const [face, setFace] = useState<CardFace>('conversation')
   const accent: CardAccent = accentFor(index)
   const sessionId = workspace.sessionIds[0]
-  const sessions = workspace.sessionIds.length
+  // The Host does not surface a "this Workspace is running" signal yet, so the
+  // card runs a small local state machine on top of `onOpen`: idle before the
+  // operator has opened it, running while the open is in flight, completed
+  // once the Promise settles. A future real signal plugs in by replacing the
+  // writes into this state — the three strings stay the right vocabulary.
+  const [status, setStatus] = useState<CardStatus>('idle')
+  const [acknowledged, setAcknowledged] = useState(false)
+
+  /** Drive the card from idle → running → completed, falling back to idle on a rejection. */
+  const handleOpen = useCallback(async (): Promise<void> => {
+    setStatus('running')
+    setAcknowledged(false)
+    try {
+      await onOpen()
+      setStatus('completed')
+    } catch {
+      setStatus('idle')
+    }
+  }, [onOpen])
+
+  /**
+   * One click anywhere on the card acknowledges a completed card: the green
+   * pulse settles down to its idle ring once the operator has seen it. Internal
+   * controls stopPropagation so a click on the open/remove button stays its
+   * own gesture and does not also acknowledge the card.
+   */
+  const onCardClick = useCallback((): void => {
+    if (status === 'completed' && !acknowledged) setAcknowledged(true)
+  }, [status, acknowledged])
 
   return (
-    <article className={`${css.card} ${css[`accent_${accent}`] ?? ''} ${face === 'files' ? css.cardFiles : ''}`}>
+    <article
+      className={`${css.card} ${css[`accent_${accent}`] ?? ''} ${css.cardFiles}`}
+      data-card-status={status}
+      data-card-acknowledged={acknowledged ? 'true' : 'false'}
+      onClick={onCardClick}
+    >
       <header className={css.cardHead}>
         {/* The card's identity is the workspace's own open gesture: picking it
             connects (reuse-or-create blank Session) and shows the Conversation,
@@ -511,36 +542,18 @@ function WorkspaceCard({
           className={css.cardOpen}
           disabled={!capability.navigation}
           title={`${t('card.activate')} — ${workspace.path}`}
-          onClick={onOpen}
+          onClick={(event) => { event.stopPropagation(); void handleOpen() }}
         >
           <span className={css.cardGlyph} aria-hidden="true"><IconFolderClose16 size={16} /></span>
           <span className={css.cardTitle}>{workspace.title}</span>
         </button>
-        <div className={css.faceSwitch}>
-          <button
-            type="button"
-            className={`${css.faceChip} ${face === 'conversation' ? css.faceChipActive : ''}`}
-            aria-pressed={face === 'conversation'}
-            onClick={() => { setFace('conversation') }}
-          >
-            {t('card.view.conversation')}
-          </button>
-          <button
-            type="button"
-            className={`${css.faceChip} ${face === 'files' ? css.faceChipActive : ''}`}
-            aria-pressed={face === 'files'}
-            onClick={() => { setFace('files') }}
-          >
-            {t('card.view.files')}
-          </button>
-        </div>
         {capability.workspaces && (
           <button
             type="button"
             className={css.iconOnly}
             aria-label={t('card.remove')}
             title={`${t('card.remove')} — ${t('card.remove.hint')}`}
-            onClick={onRemove}
+            onClick={(event) => { event.stopPropagation(); onRemove() }}
           >
             <IconTrashOutline16 size={14} />
           </button>
@@ -549,38 +562,14 @@ function WorkspaceCard({
 
       <p className={css.cardPath} title={workspace.path}>{workspace.path}</p>
 
-      {face === 'conversation'
-        ? (
-          <div className={css.conversationFace}>
-            <div className={css.metaRow}>
-              <span className={css.metaCount}>{sessions}</span>
-              <span className={css.metaLabel}>{t('card.sessions')}</span>
-            </div>
-            <div className={css.cardActions}>
-              {sessions > 0
-                ? (
-                  <button type="button" className={css.action} disabled={!capability.navigation} onClick={onOpen}>
-                    {t('card.open')}
-                  </button>
-                )
-                : (
-                  <button type="button" className={css.action} disabled={!capability.navigation} onClick={onStart}>
-                    {t('card.start')}
-                  </button>
-                )}
-            </div>
-          </div>
-        )
-        : (
-          <FileExplorer
-            root={workspace.path}
-            sessionId={sessionId}
-            t={t}
-            listDirectory={listDirectory}
-            available={capability.files}
-            onOpenFile={onOpenFile}
-          />
-        )}
+      <FileExplorer
+        root={workspace.path}
+        sessionId={sessionId}
+        t={t}
+        listDirectory={listDirectory}
+        available={capability.files}
+        onOpenFile={(path) => { onOpenFile(path) }}
+      />
 
       <footer className={css.cardFoot}>
         <span className={css.cardUpdated}>
@@ -606,7 +595,6 @@ export function WorkbenchPanel({
   selectSession,
   showConversation,
   openWorkspace,
-  startSession,
   removeWorkspace,
   listDirectory,
   useWorkspaces,
@@ -636,6 +624,22 @@ export function WorkbenchPanel({
     const timer = window.setInterval(() => { setNow(new Date()) }, 1000)
     return () => { window.clearInterval(timer) }
   }, [])
+
+  // The scheme attribute lives on the document root, not on the panel root:
+  // WorkspaceDirectoryPicker is a body-portaled Modal whose rows sit outside
+  // the panel subtree, and mounting the light token override on `:root` is
+  // what reaches both the panel and the portal in one rule. The cleanup drops
+  // the attribute only when this plugin set it, so a host that already carries
+  // one is left untouched.
+  useEffect(() => {
+    const root = document.documentElement
+    const previous = root.getAttribute('data-wb-scheme')
+    root.setAttribute('data-wb-scheme', dark ? 'dark' : 'light')
+    return () => {
+      if (previous === null) root.removeAttribute('data-wb-scheme')
+      else root.setAttribute('data-wb-scheme', previous)
+    }
+  }, [dark])
 
   /**
    * Act on one add outcome. Failures are shown, never swallowed: a picker that
@@ -731,10 +735,6 @@ export function WorkbenchPanel({
       className={css.workbench}
       role="region"
       aria-label={t('title')}
-      /* The grid's color is the one thing the host tokens cannot express:
-         white lines on a dark palette, gold ones on a light palette. The
-         attribute is what the stylesheet switches on. */
-      data-wb-scheme={dark ? 'dark' : 'light'}
     >
       <header className={css.panelHead}>
         <div className={css.headIdentity}>
@@ -811,8 +811,7 @@ export function WorkbenchPanel({
             t={t}
             capability={capability}
             listDirectory={listDirectory}
-            onOpen={() => { openWorkspace(workspace.workspaceId) }}
-            onStart={() => { startSession(workspace.workspaceId) }}
+            onOpen={() => openWorkspace(workspace.workspaceId)}
             onRemove={() => { removeWorkspace(workspace.workspaceId) }}
             onOpenFile={path => { openCardFile(workspace, path) }}
           />

@@ -39,12 +39,31 @@
   --wb-glass-tint: var(--wb-text);
   --wb-glass-edge: color-mix(in srgb, var(--wb-text) 16%, transparent);
   --wb-glass-sheen: color-mix(in srgb, var(--wb-text) 10%, transparent);
+  /* The scrim is the dark wash laid on translucent surfaces (explorer, picker,
+     foot, hover shadow). It must deepen in both palettes — on the dark canvas
+     it is a true-black wash, on the light canvas it is an ink wash of the label
+     color, so the same recipe produces a deeper tray in either world. */
+  --wb-scrim: color-mix(in srgb, #000 14%, transparent);
+  --wb-scrim-strong: color-mix(in srgb, #000 38%, transparent);
   --wb-shadow: color-mix(in srgb, #000 30%, transparent);
   /* The grid: white on the dark palette… */
   --wb-grid-minor: rgba(255, 255, 255, 0.055);
   --wb-grid-major: rgba(255, 255, 255, 0.11);
   --wb-grid-cell: 16px;
   --wb-grid-block: 80px;
+}
+
+/*
+ * Houdini registration: lets the running ring rotate the `--wb-ring-angle`
+ * variable as a real angle (interpolated continuously) rather than the
+ * browser snapping between two discrete stops. The custom property is only
+ * consumed by the `[data-card-status='running']` rule below; the declaration
+ * is harmless on hosts that ignore `@property`.
+ */
+@property --wb-ring-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
 
 /* ---- panel root (the center column's occupant) ---- */
@@ -70,8 +89,24 @@
     var(--wb-bg);
 }
 
-/* …gold on the light palette: the attribute the panel root carries. */
-.workbench[data-wb-scheme='light'] {
+/* …gold on the light palette: the attribute Workbench writes on
+ * `document.documentElement`. The selector lives on `:root` — not on
+ * `.workbench` — because WorkspaceDirectoryPicker is a body-portaled Modal,
+ * so the picker rows sit outside the panel subtree. Mounting the override on
+ * the document root cascades the light surface tokens into both the panel and
+ * the portal in one place. The same block also flips every surface and the
+ * dark scrim/shadow so the panel reads as a light sheet (not a dark sheet with
+ * a gold grid). Hosts that supply the alias tokens already set the light
+ * values; we mirror that with explicit fallbacks here so a host that omits the
+ * tokens still gets the right tones. */
+:root[data-wb-scheme='light'] {
+  --wb-bg: var(--dsw-alias-bg-base, #f7f8fa);
+  --wb-panel: var(--dsw-alias-bg-layer-1, #ffffff);
+  --wb-panel-solid: var(--dsw-alias-bg-layer-1, #ffffff);
+  --wb-overlay: var(--dsw-alias-bg-overlay, #ffffff);
+  --wb-scrim: color-mix(in srgb, var(--wb-text) 6%, transparent);
+  --wb-scrim-strong: color-mix(in srgb, var(--wb-text) 14%, transparent);
+  --wb-shadow: color-mix(in srgb, var(--wb-text) 12%, transparent);
   --wb-grid-minor: rgba(176, 128, 24, 0.14);
   --wb-grid-major: rgba(176, 128, 24, 0.3);
 }
@@ -378,28 +413,45 @@
     inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
     inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
     0 10px 28px var(--wb-shadow);
-  overflow: hidden;
+  /*
+   * No `overflow: hidden` here on purpose: the status ring layer (`.card::after`,
+   * painted at `inset: -2px`) must extend 2px beyond the card's border-box so
+   * the rotating conic and the completed pulse read as a true ring around the
+   * card, not as a clipped halo. The file explorer inside the card manages its
+   * own clipping, so the card-level overflow can stay open.
+   */
   transition: transform 0.22s var(--ds-ease-in-out), border-color 0.22s var(--ds-ease-in-out),
     box-shadow 0.22s var(--ds-ease-in-out);
 }
 
-/* The specular sheen: a diagonal band of light that drifts on hover. */
+/*
+ * Status ring layer. Sits 2px outside the card (the inset is negative so it
+ * peeks beyond the card's border-box, and its `border-radius` is 2px larger
+ * than the card's 18px so the corners stay clean and round). The card's own
+ * translucent background covers whatever portion of this layer falls inside
+ * the card, so only the 2px ring outside the border is visible — exactly the
+ * "edge light" the spec asks for. By default the layer is invisible
+ * (`background: none`) and the card uses its normal palette-correct glass rim
+ * as the idle border. The `[data-card-status]` rules below flip the background
+ * and the animation on for running / completed.
+ */
 .card::after {
   content: '';
   position: absolute;
-  inset: -40% -10%;
+  inset: -2px;
+  z-index: -1;
+  border-radius: 20px;
+  background: none;
   pointer-events: none;
-  background: linear-gradient(112deg,
-    transparent 34%,
-    color-mix(in srgb, var(--wb-glass-tint) 12%, transparent) 47%,
-    color-mix(in srgb, var(--wb-glass-tint) 4%, transparent) 53%,
-    transparent 66%);
-  transform: translateX(-14%);
-  opacity: 0.75;
-  transition: transform 0.6s var(--ds-ease-in-out), opacity 0.6s var(--ds-ease-in-out);
+  /* Conic angle — declared via `@property` below so the running animation can
+     interpolate it as a real angle, not a discrete step. Idle/completed leave
+     it at its initial value, so no visual effect. */
+  --wb-ring-angle: 0deg;
 }
 
-/* Accent rail: the card's identity edge, glowing in the card's own accent. */
+/* Accent rail: the card's identity edge, glowing in the card's own accent.
+   Unchanged — it sits to the left of the status ring layer (z-index 1 vs -1)
+   and continues to identify the card even while the ring is animated. */
 .card::before {
   content: '';
   position: absolute;
@@ -416,20 +468,19 @@
   border-color: color-mix(in srgb, var(--wb-glass-tint) 24%, transparent);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 30%, transparent),
-    0 18px 44px color-mix(in srgb, #000 38%, transparent);
+    0 18px 44px var(--wb-scrim-strong);
 }
 
-.card:hover::after {
-  transform: translateX(12%);
-  opacity: 1;
-}
+/* The hover sheen moved with the old `::after`. Hover feedback is now carried
+   entirely by `transform` + `border-color` + `box-shadow` above — the
+   status ring layer (`::after`) is reserved for the running/completed lights. */
 
 /*
  * Files mode is a browser, not a badge: the card claims real height so the
  * explorer has rows to show, and the grid row grows with it.
  */
 .cardFiles {
-  min-height: 380px;
+  min-height: 260px;
 }
 
 /* Card head: the identity button, the face switch, and the remove action. */
@@ -500,37 +551,6 @@
   color: var(--wb-text);
 }
 
-.faceSwitch {
-  display: inline-flex;
-  flex: none;
-  padding: 2px;
-  border: 1px solid var(--wb-line);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--wb-glass-tint) 4%, transparent);
-}
-
-.faceChip {
-  padding: 2px 9px;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--wb-text-dim);
-  font: inherit;
-  font-size: 11px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.14s var(--ds-ease-in-out), color 0.14s var(--ds-ease-in-out);
-}
-
-.faceChip:hover {
-  color: var(--wb-text);
-}
-
-.faceChipActive {
-  background: color-mix(in srgb, var(--card-accent) 22%, transparent);
-  color: var(--wb-text);
-}
-
 /* The Workspace directory path: read-only, one line, monospaced. */
 .cardPath {
   margin: 0;
@@ -541,45 +561,6 @@
   font-size: 11.5px;
   letter-spacing: -0.01em;
   color: color-mix(in srgb, var(--wb-accent) 55%, var(--wb-text));
-}
-
-/* Conversation face: the Session count and the open/start action. */
-.conversationFace {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 74px;
-  padding: 10px 12px;
-  border: 1px solid var(--wb-line);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--wb-glass-tint) 3%, transparent);
-}
-
-.metaRow {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-}
-
-.metaCount {
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1;
-  color: var(--wb-text);
-  font-variant-numeric: tabular-nums;
-}
-
-.metaLabel {
-  font-size: 11px;
-  color: var(--wb-text-faint);
-}
-
-.cardActions {
-  display: flex;
-  gap: 6px;
-  flex: none;
 }
 
 /* ---- the file explorer (a VS Code-shaped tree inside a card) ---- */
@@ -597,7 +578,7 @@
   min-height: 0;
   border: 1px solid var(--wb-line);
   border-radius: 12px;
-  background: color-mix(in srgb, #000 14%, transparent);
+  background: var(--wb-scrim);
   overflow: hidden;
 }
 
@@ -1011,7 +992,7 @@
   padding: 4px 0;
   border: 1px solid var(--wb-line);
   border-radius: 10px;
-  background: color-mix(in srgb, #000 16%, transparent);
+  background: var(--wb-scrim);
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--wb-glass-tint) 17%, transparent) transparent;
 }
@@ -1230,6 +1211,85 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Card status lights. The card writes `data-card-status` ("idle" | "running"
+ * | "completed") and, only on the completed branch, `data-card-acknowledged`
+ * ("true" | "false"). The default rules paint the idle state — a static,
+ * palette-correct rim — so an unmounted / data-not-yet-written card falls
+ * back to the same neutral edge the card already had.
+ *
+ * The two active states layer their colour onto the existing border and, for
+ * the running case, switch the `.card::after` ring layer from `background:
+ * none` to a rotating conic gradient. For the completed case the border
+ * itself goes green and an animated box-shadow halo breathes the edge until
+ * the user clicks the card once to acknowledge. No layout shift, no extra
+ * wrappers — the ring layer and the pulse are both painted by properties
+ * already on the card.
+ */
+
+/* Idle: explicit self-documenting rule. The card's own `border: 1px solid
+   var(--wb-glass-edge)` already paints a static, palette-correct rim (a
+   16%-mix of the label colour, near-white on the dark canvas, near-black on
+   the light canvas); this selector just makes the intent searchable and
+   guards against any future generic rule accidentally overriding it. */
+.card[data-card-status='idle'] {
+  border-color: var(--wb-glass-edge);
+}
+
+/* Running: drop the resting rim so it doesn't fight the ring's colour, and
+   paint a 2px conic-gradient ring on the `.card::after` layer. The conic
+   is mostly transparent with two short blue arcs, so as it rotates the
+   visible "blade" appears to race around the card's perimeter. The card's
+   own background sits between the ring and the content, so only the 2px
+   outside the card border reads. */
+.card[data-card-status='running'] {
+  border-color: transparent;
+}
+
+.card[data-card-status='running']::after {
+  background: conic-gradient(from var(--wb-ring-angle),
+    var(--wb-accent) 0deg,
+    var(--wb-accent) 22deg,
+    transparent 38deg,
+    transparent 322deg,
+    var(--wb-accent) 338deg,
+    var(--wb-accent) 360deg);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--wb-accent) 50%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--wb-accent) 35%, transparent);
+  animation: wbRingSpin 1.6s linear infinite;
+}
+
+/* Completed, not yet acknowledged: the border itself turns the success
+   colour so the card reads as "done", and an outer halo breathes on
+   `box-shadow` to call for acknowledgement. The halo expands out and fades
+   to transparent over the cycle so the border stays a constant, clean line. */
+.card[data-card-status='completed'] {
+  border-color: var(--wb-ok);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
+    0 10px 28px var(--wb-shadow),
+    0 0 0 0 color-mix(in srgb, var(--wb-ok) 60%, transparent);
+}
+
+.card[data-card-status='completed'][data-card-acknowledged='false'] {
+  animation: wbCompletedPulse 1.4s ease-in-out infinite;
+}
+
+/* Completed and acknowledged: the halo stops, the green border stays. The
+   selector is more specific than the unacknowledged branch so the moment
+   `data-card-acknowledged` flips to 'true' the animation drops and the
+   card settles into its resting green state. */
+.card[data-card-status='completed'][data-card-acknowledged='true'] {
+  animation: none;
+  border-color: var(--wb-ok);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
+    0 10px 28px var(--wb-shadow);
+}
+
 /* The empty card slot: one more route into the workspace add flow. */
 .addCard {
   display: flex;
@@ -1345,7 +1405,7 @@
   justify-content: space-between;
   padding: 10px 20px;
   border-top: 1px solid var(--wb-line);
-  background: color-mix(in srgb, #000 12%, transparent);
+  background: var(--wb-scrim);
 }
 
 .footHint {
@@ -1374,9 +1434,49 @@
   to { transform: rotate(360deg); }
 }
 
+/*
+ * Running ring: rotate the conic angle one full turn per cycle. The conic
+ * itself is painted on `.card::after`; the keyframe only drives the angle
+ * variable, which keeps the animation layer decoupled from the static
+ * composition of the ring.
+ */
+@keyframes wbRingSpin {
+  to { --wb-ring-angle: 360deg; }
+}
+
+/*
+ * Completed pulse: a halo around the card edge that breathes in and out so the
+ * "completion is waiting for acknowledgement" state reads as live without
+ * moving the border itself. `box-shadow` is animated rather than the border so
+ * the green border stays a constant 1px while the glow expands and fades.
+ */
+@keyframes wbCompletedPulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
+      0 10px 28px var(--wb-shadow),
+      0 0 0 0 color-mix(in srgb, var(--wb-ok) 60%, transparent);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, var(--wb-glass-tint) 20%, transparent),
+      inset 0 -1px 0 color-mix(in srgb, var(--wb-glass-tint) 5%, transparent),
+      0 10px 28px var(--wb-shadow),
+      0 0 0 6px color-mix(in srgb, var(--wb-ok) 0%, transparent);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .liveDot,
-  .explorerSpin {
+  .explorerSpin,
+  /* Card status lights must be motion-free under reduced-motion:
+     - the running ring stops spinning (the ring stays painted in its current
+       position, which is fine — the colour alone communicates "running");
+     - the completed-unacknowledged pulse stops breathing (the green border
+       alone communicates "completed and waiting for ack"). */
+  .card[data-card-status='running']::after,
+  .card[data-card-status='completed'][data-card-acknowledged='false'] {
     animation: none;
   }
 

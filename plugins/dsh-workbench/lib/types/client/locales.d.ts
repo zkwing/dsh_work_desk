@@ -26,11 +26,6 @@ export declare const zh: {
     'projects.label': string;
     'card.add': string;
     'card.add.hint': string;
-    'card.sessions': string;
-    'card.open': string;
-    'card.start': string;
-    'card.view.conversation': string;
-    'card.view.files': string;
     'card.updated': string;
     'card.remove': string;
     'card.remove.hint': string;
@@ -113,11 +108,6 @@ export declare const en: {
     'projects.label': string;
     'card.add': string;
     'card.add.hint': string;
-    'card.sessions': string;
-    'card.open': string;
-    'card.start': string;
-    'card.view.conversation': string;
-    'card.view.files': string;
     'card.updated': string;
     'card.remove': string;
     'card.remove.hint': string;

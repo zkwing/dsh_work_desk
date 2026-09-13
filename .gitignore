@@ -16,3 +16,6 @@ debug.log
 
 # Installed trees
 node_modules/
+
+# Build / typecheck scratch (stray tsconfig from a local --noEmit pass)
+.tsc/

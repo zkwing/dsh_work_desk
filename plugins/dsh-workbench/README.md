@@ -2,10 +2,10 @@
 
 工作区的可视化拓展插件：它本身就是一个**全局面板**（和「工作区」同样的挂载方式）——
 侧边栏面板列表里多一行「工作台」，选中它就把中列换成控制室：**一张卡片就是一个工作区**，
-每张卡片可在「对话」与「文件」两种面貌间切换，网格末尾留一个带加号的空卡片位，
+卡片正文就是该工作区的文件资源管理器，网格末尾留一个带加号的空卡片位，
 点它走与侧边栏「添加工作区」完全相同的目录选择流程。同一份包同时运行在普通 `dsh web` 和 DSH Desktop 上。
 
-卡片的「文件」面貌是一个 **VS Code 形状的资源管理器**：一个扁平行列表，按层缩进并画竖线导引，
+卡片正文是一个 **VS Code 形状的资源管理器**：一个扁平行列表，按层缩进并画竖线导引，
 目录带展开箭头与开合图标，文件用 `ui-primitives` 的 `FileTypeIcon` 按扩展名出图标，
 目录在前、其后按自然序（`file2` 排在 `file10` 前），方向键上下移动、左右展开/折叠，
 每个目录只在**第一次展开**时去列它那一层。
@@ -73,7 +73,7 @@ hover 时高光缓慢扫过并轻微上浮。玻璃的色调从 `--wb-glass-tint
 | 层 | 服务 | 缺失时的行为 |
 | --- | --- | --- |
 | 必需 | `slots`、`locale` | 没有它们就没有槽位与文案，插件不注册（这是唯一合理的 pending） |
-| 可选 | `uiWorkspace`、`workspaces`、`remote.workspaceFiles`、`remote.directoryPicker`、`sidebarRight` | 面板照常挂载：相关控件禁用、面板顶部说明缺什么，文件面貌给出一行失败级 + 重试 |
+| 可选 | `uiWorkspace`、`workspaces`、`remote.workspaceFiles`、`remote.directoryPicker`、`sidebarRight` | 面板照常挂载：相关控件禁用、面板顶部说明缺什么，卡片内文件列表给出一行失败级 + 重试 |
 
 插件**不能把可选能力在 `apply` 时探一次就定死**。这是本插件踩过的坑，也是它现在形状的原因：
 
@@ -112,13 +112,13 @@ hover 时高光缓慢扫过并轻微上浮。玻璃的色调从 `--wb-glass-tint
 | --- | --- |
 | 1. 工作台是工作区的拓展，加一个工作区就多一张卡片 | 卡片列表直接读 Host 工作区快照：`useWorkspaces`（`ctx.workspaces.list`，由 `ui-workspace` 经 `ctx.slots.provideRoot` 提供的全局标准 hook）。插件**没有自己的名单与存储**，所以在任何地方增删工作区，网格同步变化。点卡片标题 = 官方侧边栏点一行工作区（`ctx.uiWorkspace.openWorkspace`：连接/复用空白会话 → 打开 → `layout.selectPanel(null)`） |
 | 2. 原有添加工作区入口保留，卡片区另有加号空位可点击新增 | 标题栏 `[+ 添加工作区]` 与网格末尾的加号卡片走同一条流程：先 `remote.directoryPicker.pick()`（系统选择器），被拒就打开插件自带的 `WorkspaceDirectoryPicker`（`uiWorkspace.listDirectory` / `createDirectory`），两条路最后都落到同一个登记动作 `ctx.workspaces.create({ path })`。侧边栏原有的「Add workspace…」入口完全没动。任何一步失败都会在面板顶部显示 Host 给的原因，而不是静默 |
-| 3. 每个工作区既能显示对话，也能显示文件列表（VS Code 方式） | 卡片头部的 `[对话\|文件]` 切换。对话面貌显示会话数与「打开对话 / 新建会话」（`ctx.uiWorkspace.openWorkspace` / `startSession`）；文件面貌是 `FileExplorer`：`remote.workspaceFiles.list(sessionId, path, signal)` 按层懒加载，扁平行列表 + 缩进导引 + 类型图标 + 选中态 + 方向键（`explorerRows()` 负责行序与层级，纯函数、可单独断言） |
+| 3. 每个工作区在卡片里显示文件列表（VS Code 方式） | 卡片正文是 `FileExplorer`：`remote.workspaceFiles.list(sessionId, path, signal)` 按层懒加载，扁平行列表 + 缩进导引 + 类型图标 + 选中态 + 方向键（`explorerRows()` 负责行序与层级，纯函数、可单独断言）。点卡片标题触发**本地状态机**：`openWorkspace()` Promise 触发时进入 `running`（蓝色沿边旋转），resolve 时进入 `completed`（绿色边沿跳动），失败回 `idle`（白色边沿）；`completed` 状态下未确认时点卡片一次置 `acknowledged`（停止跳动）。状态机写在卡片组件本地，词汇固定，未来要接真实信号只需替换写入点（见 `cards.ts`） |
 | 4. 双击文件在右侧专门界面显示内容 | 双击（或回车）= `ctx.sidebarRight.openTab('workbench-editor', { sessionId, path })`，本插件自带的编辑器页签在右侧栏展开；标题栏 ◱ 走 `openResource(fileAddress(...))` 切到官方 `text` 类型（代码高亮 / Markdown / PDF / 图片）。地址文法由本插件按文档自己实现（`fileAddress()`），因为 `dsh-util-workspace-path` 不在平台基线模块表里；没人认领地址时的抛错被转成面板顶部一行提示 |
 | 5. 像 VS Code 一样能编辑并保存 | 编辑器通过**本插件自己的 Host 路由**读写：`POST /workbench/file/read` 取文本 + 版本，`POST /workbench/file/write` 原子替换。写有三道闸：**只改已存在的普通文件**、**路径必须在该会话的工作区根内**、**版本必须仍是读到的那个**（对不上答 `workbench/stale`，编辑器让你先重新读取而不是覆盖）。沙箱策略用的是组合自己解析出来的那份（会话 live 时带会话 override；会话没加载时用**持久化的 cwd** 当 `workspace-write` 边界、模式仍取部署默认——与 DSH 对 live 会话的规则一致，不额外放宽）。所以 `read-only` 部署下保存就是被拒 |
 
-文件面貌用**该工作区第一个会话**作为 scope id，因为 Host 的 `list` 会用这个会话的 workspace root 做包含校验
+卡片正文用**该工作区第一个会话**作为 scope id，因为 Host 的 `list` 会用这个会话的 workspace root 做包含校验
 （`workspace-file/outside-workspace` 会被转成行内提示 + 重试按钮，不会抛出）。工作区还没有会话时，
-文件面貌提示先新建会话。
+卡片提示先新建会话。
 
 ## 兼容性
 
@@ -430,7 +430,7 @@ Get-ChildItem $dir -File | ForEach-Object {
 
 两个已经修掉、但值得记住的现象：
 
-- **文件面貌说文件能力没挂载** —— 来自「探一次就定死」。现在同样的文案只可能出现在真正的早期请求上，
+- **卡片正文说文件能力没挂载** —— 来自「探一次就定死」。现在同样的文案只可能出现在真正的早期请求上，
   点一下「重新读取」就会重新解析一次服务。
 - **点加号什么也不发生** —— 来自「把 reject 吞进未处理的 promise」+「假定 pick 一定可用」。
   Desktop 组的是 browse 后端，`pick` 被 Host 明确拒绝；现在那条拒绝被读成「改用应用内浏览器」，
@@ -450,8 +450,8 @@ src/client/index.ts     浏览器半：注册 workbench 字典 + 占 main/workbe
 src/client/Workbench.tsx        面板体（控制室）+ 面板行图标 + 工作区卡片 + FileExplorer（VS Code 形状）
 src/client/WorkbenchFileEditor.tsx  右侧栏编辑器页签：读取、编辑、Ctrl+S 保存、版本冲突提示、切官方预览
 src/client/WorkspaceDirectoryPicker.tsx  browse 后端下的应用内目录浏览器（面包屑 + 新建文件夹）
+src/client/cards.ts            卡片本地状态机类型（CardStatus = idle | running | completed）
 src/client/workspaces.ts        卡片模型、强调色、能力源、资源管理器行模型、pick 分支表、资源地址、错误码→文案
-src/client/cards.ts             卡片面貌类型
 src/client/Workbench.module.css 全部样式（深色玻璃控制室 + 资源管理器 + 选择器 + 编辑器）
 src/client/locales.ts           workbench 命名空间词典（zh 为准，en 对齐）
 build-plugin.ps1                构建编排（暂存 → tsc（Host 半 + 客户端半）→ tsdown（浏览器半）→ 收回 lib/）
@@ -466,9 +466,10 @@ lib/client.js          浏览器半构建产物（随包分发）
 
 ## 边界
 
-- 卡片只读工作区身份（标题、目录、会话列表、时间戳）与目录树；
-  卡片的「对话」面貌只做导航（打开/新建会话），不在卡片内嵌真正的聊天渲染 ——
+- 卡片只读工作区身份（标题、目录、会话列表、时间戳）与目录树；卡片正文不再做对话导航 —
   真正的会话视图仍是主列 `conversation` 槽位的所有权。
+  卡片运行状态是**插件本地状态机**（`idle | running | completed`），不依赖 Host 运行态信号；
+  状态机写在卡片组件本地，词汇固定，未来如要接真实会话/Agent 状态，只替换写入点。
 - 资源管理器只列目录、不做过滤搜索；点文件只是选中，**双击在右侧栏打开编辑器**。
   右侧栏的官方 `text` 类型仍负责只读渲染（Markdown / 图片 / PDF），编辑器标题栏的 ◱ 一键切过去。
 - **写文件的边界**（这一版新增，读的时候请留意）：保存会**真的改你磁盘上的文件**。
@@ -490,7 +491,7 @@ lib/client.js          浏览器半构建产物（随包分发）
   而 5.1 的 `FolderBrowserDialog` 正是上游**刻意删掉**的那一级（旧的 `SHBrowseForFolder` 树 + DPI 问题，
   且它也没有地址栏）。想要真正的现代 Windows 目录对话框，就在 Windows 上跑一个 loopback 的
   `dsh web` 宿主（`check-live-host.mjs` 会打印这次启动组的是哪种交互）。
-- 文件面貌用第一个会话当 scope，所以**刚登记、还没有会话的工作区**只能看到提示；
+- 卡片用第一个会话当 scope，所以**刚登记、还没有会话的工作区**只能看到提示；
   这是 Host `list` 的鉴权模型决定的，不是可以绕过的实现细节。
 - 选择器每次打开都回到主目录，也不记忆上次位置。
 - 没有卡片拖拽排序（工作区顺序仍在侧边栏里排）、没有展开状态持久化：
@@ -498,4 +499,4 @@ lib/client.js          浏览器半构建产物（随包分发）
 - 嵌套递归有 `MAX_EXPLORER_DEPTH = 32` 的硬上限（符号链接成环时不会无限展开）。
 - Host 半是两条文件路由，不提供 service/tool；也不注册命令。
 - 分发只做到 **tarball 与 git 仓库**两种（见「装到另一台电脑」）；面向 npm 的发布
-  （去 `private`、抢 `dsh-workbench` 这个名字、README 双语、LICENSE 文件）尚未做。
+  （去 `private`、抢 `dsh-workbench` 这个名字、README 双语）尚未做。

@@ -8,8 +8,8 @@
 # `/plugins/dsh-workbench/client.js` to the browser.
 #
 # No other plugin's row is targeted, overridden, or disabled — the workbench
-# composes through the official `sidebar.footer.action` slot at runtime and
-# needs no patch of the sidebar it occupies.
+# composes through the official `main` and `sidebar.panellist` slots at runtime
+# and needs no patch of the sidebar it occupies.
 - insert:
     - id: workbench
       name: dsh-workbench
