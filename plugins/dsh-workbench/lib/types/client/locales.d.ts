@@ -29,6 +29,9 @@ export declare const zh: {
     'card.updated': string;
     'card.remove': string;
     'card.remove.hint': string;
+    'card.state.idle': string;
+    'card.state.running': string;
+    'card.state.completed': string;
     'card.activate': string;
     'file.open': string;
     'file.noPane': string;
@@ -111,6 +114,9 @@ export declare const en: {
     'card.updated': string;
     'card.remove': string;
     'card.remove.hint': string;
+    'card.state.idle': string;
+    'card.state.running': string;
+    'card.state.completed': string;
     'card.activate': string;
     'file.open': string;
     'file.noPane': string;

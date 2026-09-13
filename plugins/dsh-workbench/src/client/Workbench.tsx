@@ -572,6 +572,16 @@ function WorkspaceCard({
       />
 
       <footer className={css.cardFoot}>
+        {/* The status label carries the same three-state vocabulary the card's
+           border colour does (so the running/completed states aren't conveyed
+           by colour alone — the Swiss checklist demands a non-colour channel). */}
+        <span className={css.cardStatus} data-card-state={status}>
+          {status === 'running'
+            ? t('card.state.running')
+            : status === 'completed'
+              ? t('card.state.completed')
+              : t('card.state.idle')}
+        </span>
         <span className={css.cardUpdated}>
           {t('card.updated')} {shortTime(workspace.updatedAt)}
         </span>

@@ -280,54 +280,70 @@
     var(--wb-bg);
 }
 
-/* …gold on the light palette: the attribute Workbench writes on
- * `document.documentElement`. The selector lives on `:root` — not on
+/* …Swiss International palette on the light scheme: black, white, red (the
+ * emphasis colour), blue (the optional accent), and two greys for the resting
+ * guide line and the hover wash. The selector lives on `:root` — not on
  * `.workbench` — because WorkspaceDirectoryPicker is a body-portaled Modal,
  * so the picker rows sit outside the panel subtree. Mounting the override on
  * the document root cascades the light surface tokens into both the panel and
- * the portal in one place. The same block also flips every surface and the
- * dark scrim/shadow so the panel reads as a light sheet (not a dark sheet with
- * a gold grid). Hosts that supply the alias tokens already set the light
- * values; we mirror that with explicit fallbacks here so a host that omits the
- * tokens still gets the right tones. */
+ * the portal in one place. */
 :root[data-wb-scheme='light'] {
-  /* The canvas is a faintly inked paper rather than the host's pure-white base:
-     in the light palette `bg-base`, `bg-layer-1` and `bg-overlay` are all
-     near-white, so modules painted straight from them dissolve into one
-     another. Tinting the canvas is what gives the white module sheets below
-     something to sit on. Mixed from the host's own ink and layer tokens, so a
-     third-party light theme retones it with no extra rule. */
-  --wb-bg: color-mix(in srgb, var(--wb-text) 6%, var(--dsw-alias-bg-layer-1, #ffffff));
-  --wb-panel: var(--dsw-alias-bg-layer-1, #ffffff);
-  --wb-panel-solid: var(--dsw-alias-bg-layer-1, #ffffff);
-  --wb-overlay: var(--dsw-alias-bg-overlay, #ffffff);
-  --wb-scrim: color-mix(in srgb, var(--wb-text) 5%, transparent);
-  --wb-scrim-strong: color-mix(in srgb, var(--wb-text) 13%, transparent);
-  --wb-shadow: color-mix(in srgb, var(--wb-text) 12%, transparent);
-  /* The top wash: on the light canvas the accent token is near-black (the host's
-     monochrome brand), so the dark palette's recipe would smear a grey cloud
-     over the paper. A white glow instead lifts the top of the sheet and lets the
-     modules below keep the eye. */
-  --wb-ambient-halo: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 72%, transparent);
-  /* Module material. A crisper hairline than the dark recipe (16% ink washes out
-     against a white sheet and the modules lose their outline), with a matching
-     but slightly lighter top rim; a white top highlight in place of the dark
-     palette's ink sheen (the "lit from above" cue belongs to the sheet's own
-     colour here); and a two-layer contact shadow — a tight line plus a wide
-     faint pool — in place of the single soft plunge. */
-  --wb-glass-edge: color-mix(in srgb, var(--wb-text) 14%, transparent);
-  --wb-rim-top: color-mix(in srgb, var(--wb-text) 10%, transparent);
-  --wb-card-base: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 94%, transparent);
-  --wb-card-rim: color-mix(in srgb, var(--dsw-alias-bg-layer-1, #ffffff) 70%, transparent);
-  --wb-card-shadow:
-    0 1px 2px color-mix(in srgb, var(--wb-text) 8%, transparent),
-    0 12px 28px -10px color-mix(in srgb, var(--wb-text) 18%, transparent);
-  /* …amber-gold on the light palette: a faint wash of the warn token draws the
-     "engineering print" tint the spec asks for. Both warn tokens (light & dark)
-     are amber-500 in design-platform.css, so the same recipe works across themes
-     and follows any theme that retunes warn. */
-  --wb-grid-minor: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #b08018) 18%, transparent);
-  --wb-grid-major: color-mix(in srgb, var(--dsw-alias-state-warn-primary, #b08018) 36%, transparent);
+  /* Surfaces: black borders, white interiors. The earlier tinted-paper recipe
+     is gone; in Swiss every surface is either #ffffff or #000000, with the
+     grid lines in #cccccc / #e8e8e8 doing the only separating work. */
+  --wb-bg: #ffffff;
+  --wb-panel: #ffffff;
+  --wb-panel-solid: #ffffff;
+  --wb-overlay: #ffffff;
+  /* Lines: hairline guide (#cccccc) and module edge (#000000). The host's
+     `--dsw-alias-border-*` aliases aren't read here because the Swiss palette
+     is literal; a third-party theme that retunes `--dsw-alias-border-*` will
+     not change the panel, by design. */
+  --wb-line: #000000;
+  --wb-line-strong: #000000;
+  --wb-glass-edge: #000000;
+  --wb-glass-sheen: #000000;
+  --wb-glass-tint: #000000;
+  --wb-rim-top: #000000;
+  --wb-rim-bottom: #000000;
+  /* Ink: primary black, dimmed #666666 for caption text, faint #999999 for
+     placeholders and tertiary marks. */
+  --wb-text: #000000;
+  --wb-text-dim: #666666;
+  --wb-text-faint: #999999;
+  /* Status: red is the Swiss emphasis colour; blue (#0057b8) is the style kit's
+     optional secondary accent, used here for the "completed" state so it reads
+     as informational rather than as an error. Warn has no Swiss colour of its
+     own, so the warn token drops to black. */
+  --wb-accent: #ff0000;
+  --wb-danger: #ff0000;
+  --wb-warn: #000000;
+  --wb-ok: #0057b8;
+  --wb-focus-ring: #ff0000;
+  /* Decoration neutralised: shadows, scrims and the ambient halo are zeroed so
+     every box-shadow and background wash the shared rules compose becomes
+     invisible. Module surfaces are then drawn explicitly below. */
+  --wb-ambient-halo: #ffffff;
+  --wb-shadow: transparent;
+  --wb-scrim: transparent;
+  --wb-scrim-strong: transparent;
+  --wb-card-rim: transparent;
+  --wb-card-shadow: 0 0 0 transparent;
+  --wb-card-base: #ffffff;
+  /* Square corners: every radius token collapses to zero so panels, cards,
+     buttons, tiles, chips, scrollbars, and the picker all line up on the
+     grid's 4px rhythm. The earlier 12px / 14px / 18px / 999px radii were
+     glassmorphism, not Swiss. */
+  --wb-radius-card: 0;
+  --wb-radius-lg: 0;
+  --wb-radius-md: 0;
+  --wb-radius-sm: 0;
+  --wb-radius-pill: 0;
+  /* Grid: two greys instead of the dark palette's white wash and the earlier
+     amber-gold recipe — gold isn't in the Swiss palette, and a black grid
+     at 16px would overpower the modules. */
+  --wb-grid-minor: #e8e8e8;
+  --wb-grid-major: #cccccc;
 }
 
 /*
@@ -1907,152 +1923,956 @@
 }
 
 /* ==========================================================================
- * Light palette: module separation
+ * Swiss International — light palette
  * --------------------------------------------------------------------------
- * In the light palette the host's canvas, its raised layer, and its overlay are
- * all near-white, so modules painted straight from those aliases dissolve into
- * one another. The token block above already carries every palette-specific
- * value the *shared* rules consume (`--wb-bg` / `--wb-ambient-halo` /
- * `--wb-glass-edge` / `--wb-rim-top` / `--wb-card-base` / `--wb-card-rim` /
- * `--wb-card-shadow`), which is what keeps the card's hover, focus, and
- * running/completed states coherent instead of being re-declared here. What
- * follows are the modules whose whole material differs and that carry no state
- * of their own, so one scoped rule each is enough:
- *
- *   head       a white bar floating above the scrolling grid
- *   headGlyph  a solid ink keystone with a sheet-coloured mark
- *   readings   a tinted tray carrying white instrument tiles
- *   card       a white sheet (base and elevation ride the tokens above)
- *   explorer   a well recessed into the card
- *   foot       a muted status strip, dimmer than the tray above it
- *   add/empty  translucent slots with a real hairline and a contact shadow
- *
- * The scoped selector outranks the shared rule it overrides, so the rules here
- * are complete declarations, not deltas. Every colour is mixed from the host's
- * ink and layer tokens, so a third-party light theme retones the whole stack
- * with no extra rule.
+ * The shared rules above are written for the dark palette and accumulate a
+ * long list of glassmorphism properties (conic sheens, multi-layer washes,
+ * rounded corners, decorative box-shadows, 220ms ease-in-out transitions,
+ * transforms on hover, the 3px accent rail and a rotating conic status ring).
+ * Every one of those is forbidden in Swiss International style, so the light
+ * scheme drops them on the floor. The token block above zeroes every shadow
+ * colour and every radius, which neutralises most decoration automatically;
+ * what follows is what still needs explicit statements, plus the Swiss
+ * interaction vocabulary: the guide line that activates from #cccccc to
+ * #ff0000, the category label that turns red on hover, and the arrow that
+ * alone is allowed to translate.
  * ========================================================================== */
 
-/* The head: a white bar with a hairline beneath and a soft shadow, so the card
-   grid scrolls *behind* it rather than through it. */
+/* The canvas: a single flat white. The earlier tinted-paper recipe and the
+   two radial halo washes above the bg are gone — Swiss forbids gradients,
+   and the host's near-white canvas is already the right colour. */
+:root[data-wb-scheme='light'] .workbench {
+  background: #ffffff;
+}
+
+/* The engineering grid: now two greys (#e8e8e8 minor, #cccccc major). The
+   gold recipe above is retired because amber isn't in the Swiss palette.
+   The radial mask is removed because it was softening a glass surface that
+   no longer exists; the grid now stands behind every module as a flat
+   structural cue. */
+:root[data-wb-scheme='light'] .workbench::before {
+  background-image:
+    linear-gradient(#e8e8e8 1px, transparent 1px),
+    linear-gradient(90deg, #e8e8e8 1px, transparent 1px),
+    linear-gradient(#cccccc 1px, transparent 1px),
+    linear-gradient(90deg, #cccccc 1px, transparent 1px);
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+/* ── Head ────────────────────────────────────────────────────────────────── */
+
 :root[data-wb-scheme='light'] .panelHead {
+  background: #ffffff;
+  border-bottom: 1px solid #000000;
+  box-shadow: none;
   z-index: 2;
-  border-bottom-color: var(--wb-glass-edge);
-  background: var(--wb-panel);
-  box-shadow:
-    0 1px 0 color-mix(in srgb, var(--wb-text) 4%, transparent),
-    0 8px 18px -10px color-mix(in srgb, var(--wb-text) 16%, transparent);
+  padding: 20px 22px;
 }
 
-/* The panel's identity mark: a solid ink keystone with a sheet-coloured glyph,
-   instead of the dark palette's accent-washed tile. The host's light brand is
-   near-black, so "ink" is the palette's own accent — a filled badge reads as
-   deliberate where a low-alpha wash of the same colour reads as faded. */
 :root[data-wb-scheme='light'] .headGlyph {
-  border-color: color-mix(in srgb, var(--wb-text) 88%, transparent);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--wb-panel) 18%, transparent) 0%,
-      transparent 52%),
-    linear-gradient(150deg,
-      color-mix(in srgb, var(--wb-text) 96%, transparent),
-      color-mix(in srgb, var(--wb-text) 76%, transparent));
-  color: var(--wb-panel);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--wb-panel) 30%, transparent),
-    0 6px 16px -6px color-mix(in srgb, var(--wb-text) 42%, transparent);
+  background: #000000;
+  border: 1px solid #000000;
+  color: #ffffff;
+  box-shadow: none;
+  width: 36px;
+  height: 36px;
 }
 
-/* The readings strip: a tinted tray. The white tiles standing on it are what
-   make the four figures read as four instruments instead of one band. */
+/* Headline: big, bold, tight — Swiss H2 sizing inside a panel header, not the
+   doc-page H1, because the panel sits below the host's navigation. */
+:root[data-wb-scheme='light'] .title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: #000000;
+}
+
+/* Subtitle becomes a Swiss label: uppercase, wide-tracked, dimmed ink. */
+:root[data-wb-scheme='light'] .subtitle {
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #666666;
+}
+
+/* Live status chip: a flat black-bordered rectangle with a static black
+   square marker (the dot's pulse and glow are decoration; the chip's text
+   carries the meaning). */
+:root[data-wb-scheme='light'] .live {
+  height: auto;
+  padding: 4px 10px;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  box-shadow: none;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+:root[data-wb-scheme='light'] .liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: #000000;
+  box-shadow: none;
+  animation: none;
+}
+
+/* ── Actions: text buttons (the only button class that needs the arrow) ── */
+
+:root[data-wb-scheme='light'] .action {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  box-shadow: none;
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .action:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  color: #000000;
+  transform: none;
+}
+:root[data-wb-scheme='light'] .action:active:not(:disabled) {
+  background: #e5e5e5;
+  border-color: #ff0000;
+  transform: none;
+}
+:root[data-wb-scheme='light'] .action:focus-visible {
+  outline: 2px solid #ff0000;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* The direction marker the style kit requires. It is the one element that is
+   permitted to translate; everything else on the panel must stay still on
+   hover (Rational Restraint). */
+:root[data-wb-scheme='light'] .action::after {
+  content: '→';
+  margin-left: 6px;
+  font-weight: 400;
+  transition: transform 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .action:hover:not(:disabled)::after {
+  transform: translateX(2px);
+}
+
+/* ── Icon-only buttons (card remove, refresh tools, picker tools) ──────── */
+
+:root[data-wb-scheme='light'] .iconOnly {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+  color: #000000;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .iconOnly:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #000000;
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .iconOnly:focus-visible {
+  outline: 2px solid #ff0000;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* ── Readings strip ─────────────────────────────────────────────────────── */
+
 :root[data-wb-scheme='light'] .readings {
-  border-bottom-color: var(--wb-glass-edge);
-  background: color-mix(in srgb, var(--wb-text) 5%, transparent);
+  background: #ffffff;
+  border-bottom: 1px solid #000000;
+  padding: 16px 22px;
+  gap: 12px;
 }
-
-/* One instrument tile. The first background layer is a 2px accent rail pinned
-   to the tile's top edge and clipped by its own radius — the strip's single
-   flourish, drawn as a background so it needs no extra element or overflow. */
 :root[data-wb-scheme='light'] .reading {
-  border-color: var(--wb-glass-edge);
-  border-top-color: var(--wb-rim-top);
-  background:
-    linear-gradient(90deg,
-      color-mix(in srgb, var(--wb-accent) 34%, transparent) 0%,
-      transparent 42%) top left / 100% 2px no-repeat,
-    color-mix(in srgb, var(--wb-panel) 96%, transparent);
-  box-shadow:
-    inset 0 1px 0 var(--wb-card-rim),
-    var(--wb-card-shadow);
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  padding: 12px 14px;
+  box-shadow: none;
+  gap: 6px;
+}
+:root[data-wb-scheme='light'] .readingLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .readingValue {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .readingHint {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #666666;
 }
 
-/* The card: a white sheet. Base colour, hairline, top highlight and elevation
-   all ride the tokens above, so this rule repaints only the background — the
-   one property the card's hover, focus, and status rules never touch. The dark
-   palette's four-layer glass becomes a two-layer sheet with a faint accent wash
-   at the lit edge, and the blur is eased off because there is far less colour
-   behind a light card for it to smear. */
+/* ── Projects grid ──────────────────────────────────────────────────────── */
+
+:root[data-wb-scheme='light'] .projects {
+  padding: 24px 22px;
+  gap: 16px;
+  scrollbar-color: #000000 transparent;
+}
+:root[data-wb-scheme='light'] .projects::-webkit-scrollbar { width: 8px; }
+:root[data-wb-scheme='light'] .projects::-webkit-scrollbar-thumb {
+  background: #000000;
+  border: none;
+  border-radius: 0;
+  background-clip: border-box;
+}
+:root[data-wb-scheme='light'] .projects::-webkit-scrollbar-thumb:hover {
+  background: #000000;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+
+/* The card is a flat white rectangle with a 1px black border and a grey left
+   guide line (#cccccc). The earlier four-layer glass, the conic sheen, the
+   accent rail and the contact shadow are all gone. */
 :root[data-wb-scheme='light'] .card {
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--card-accent) 6%, transparent) 0%,
-      transparent 56%),
-    var(--wb-card-base);
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-left: 1px solid #cccccc;
+  border-radius: 0;
+  padding: 16px;
+  gap: 10px;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .card:hover {
+  background: #f0f0f0;
+  border-color: #000000;
+  border-left-color: #ff0000;
+  transform: none;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .card:focus-visible {
+  outline: 2px solid #ff0000;
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
-/* The explorer: a well carved into the sheet. `--wb-scrim` already reads as a
-   faint grey here, but a well needs its own rim and an inner shadow or it
-   disappears into the white card around it. */
+/* The three card states, each carried by a single colour change plus the text
+   label the card foot now renders. The rotating conic status ring and the
+   breathing completed halo are forbidden decoration; the border is enough
+   when the status label says so. */
+:root[data-wb-scheme='light'] .card[data-card-status='idle'] {
+  border-left-color: #cccccc;
+}
+:root[data-wb-scheme='light'] .card[data-card-status='running'] {
+  border-color: #ff0000;
+  border-left-color: #ff0000;
+}
+:root[data-wb-scheme='light'] .card[data-card-status='running']::after {
+  background: none;
+  animation: none;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .card[data-card-status='completed'] {
+  border-color: #0057b8;
+  border-left-color: #0057b8;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .card[data-card-status='completed'][data-card-acknowledged='false'] {
+  animation: none;
+}
+:root[data-wb-scheme='light'] .card[data-card-status='completed'][data-card-acknowledged='true'] {
+  border-color: #0057b8;
+  border-left-color: #0057b8;
+}
+
+/* The 3px accent rail and the status ring layer are forbidden Swiss decoration
+   (single-side stripe + decorative ring). The card's identity in light is the
+   text label, not a coloured stripe. */
+:root[data-wb-scheme='light'] .card::before { display: none; }
+:root[data-wb-scheme='light'] .card::after {
+  background: none;
+  box-shadow: none;
+}
+
+/* ── Card head ──────────────────────────────────────────────────────────── */
+
+:root[data-wb-scheme='light'] .cardHead {
+  align-items: center;
+}
+:root[data-wb-scheme='light'] .cardOpen {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: #000000;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  transition: color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .cardOpen:hover:not(:disabled) {
+  background: transparent;
+  color: #ff0000;
+  transform: none;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .cardOpen:active:not(:disabled) {
+  transform: none;
+}
+:root[data-wb-scheme='light'] .cardOpen:focus-visible {
+  outline: 2px solid #ff0000;
+  outline-offset: 2px;
+}
+:root[data-wb-scheme='light'] .cardGlyph { color: #000000; }
+:root[data-wb-scheme='light'] .cardOpen:hover:not(:disabled) .cardGlyph {
+  color: #ff0000;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .cardTitle {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
+/* The card title button gets its own direction arrow — the style kit treats
+   every button as needing one, and "→" here is "open this workspace". */
+:root[data-wb-scheme='light'] .cardOpen::after {
+  content: '→';
+  margin-left: 8px;
+  font-weight: 400;
+  color: #cccccc;
+  transition:
+    color 150ms ease-out,
+    transform 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .cardOpen:hover:not(:disabled)::after {
+  color: #ff0000;
+  transform: translateX(2px);
+}
+
+/* Hierarchy Focus: the path (the card's category label) turns red when the
+   card is hovered. It is the only place the card "wears" the Swiss accent. */
+:root[data-wb-scheme='light'] .cardPath {
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #666666;
+  transition: color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .card:hover .cardPath {
+  color: #ff0000;
+}
+
+/* ── Card foot + status label ───────────────────────────────────────────── */
+
+:root[data-wb-scheme='light'] .cardFoot {
+  border-top: 1px solid #cccccc;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+:root[data-wb-scheme='light'] .cardUpdated {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #666666;
+}
+/* The status label satisfies the "no colour-alone state" check the style kit
+   demands: every card reads "IDLE / RUNNING / COMPLETED" in uppercase
+   tracked ink, with the running/completed tokens retoning the word itself. */
+:root[data-wb-scheme='light'] .cardStatus {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .cardStatus[data-card-state='running'] { color: #ff0000; }
+:root[data-wb-scheme='light'] .cardStatus[data-card-state='completed'] { color: #0057b8; }
+
+/* ── Explorer ────────────────────────────────────────────────────────────── */
+
 :root[data-wb-scheme='light'] .explorer {
-  border-color: var(--wb-glass-edge);
-  border-top-color: var(--wb-glass-edge);
-  background: color-mix(in srgb, var(--wb-text) 4%, transparent);
-  box-shadow: inset 0 2px 5px color-mix(in srgb, var(--wb-text) 9%, transparent);
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: none;
 }
-
 :root[data-wb-scheme='light'] .explorerHead {
-  border-bottom-color: color-mix(in srgb, var(--wb-text) 8%, transparent);
-  background: color-mix(in srgb, var(--wb-text) 5%, transparent);
+  background: #ffffff;
+  border-bottom: 1px solid #000000;
+  height: 32px;
+  padding: 0 10px;
+}
+:root[data-wb-scheme='light'] .explorerCaret { color: #000000; }
+:root[data-wb-scheme='light'] .explorerTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #000000;
+}
+/* The parent path goes left-aligned and loses its monospace face — both are
+   Swiss-mandated; the file host's code font is banned (font-mono). */
+:root[data-wb-scheme='light'] .explorerParent {
+  text-align: left;
+  font-family: inherit;
+  font-size: 10.5px;
+  color: #666666;
+}
+:root[data-wb-scheme='light'] .explorerTools { gap: 2px; }
+:root[data-wb-scheme='light'] .explorerTool {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0;
+  color: #000000;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .explorerTool:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #000000;
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .explorerTool:disabled {
+  background: transparent;
+  color: #cccccc;
+  border-color: transparent;
+  opacity: 1;
+}
+:root[data-wb-scheme='light'] .explorerTool:focus-visible,
+:root[data-wb-scheme='light'] .explorerRow:focus-visible,
+:root[data-wb-scheme='light'] .explorerRetry:focus-visible {
+  outline: 2px solid #ff0000;
+  outline-offset: -2px;
 }
 
-/* The foot: a muted status strip, dimmer than the readings tray so the shell
-   reads as head → tray → body → plinth. */
-:root[data-wb-scheme='light'] .panelFoot {
-  border-top-color: var(--wb-glass-edge);
-  background: color-mix(in srgb, var(--wb-text) 5%, transparent);
+:root[data-wb-scheme='light'] .explorerRows {
+  padding: 4px 0;
+  scrollbar-color: #000000 transparent;
+}
+:root[data-wb-scheme='light'] .explorerRows::-webkit-scrollbar { width: 8px; }
+:root[data-wb-scheme='light'] .explorerRows::-webkit-scrollbar-thumb {
+  background: #000000;
+  border: none;
+  border-radius: 0;
+  background-clip: border-box;
+}
+:root[data-wb-scheme='light'] .explorerRows::-webkit-scrollbar-thumb:hover {
+  background: #000000;
 }
 
-/* The empty slot and the empty state: still translucent so the gold grid shows
-   through, but with a real hairline and the same contact shadow a card casts,
-   so an empty grid reads as a layout rather than as a hole. */
+/* The per-row indent guide: Swiss uses a faint vertical line instead of the
+   dark palette's chevron-style guide blocks. The line is painted on the row
+   background at a fixed offset that matches the indent grid (12px per level
+   + 20px left padding). The host's chevron column is hidden so the line
+   owns the indent. */
+:root[data-wb-scheme='light'] .explorerRow {
+  border-radius: 0;
+  transition: background-color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .explorerRow:hover {
+  background: #f0f0f0;
+  border-color: transparent;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .explorerRow:hover .explorerGlyph {
+  color: #000000;
+  box-shadow: none;
+}
+/* The selected row inverts to black-on-white. The dark palette's accent-tinted
+   wash is decoration; a clean Swiss inversion carries the selection state
+   unambiguously and the file-type icon still reads through currentColor. */
+:root[data-wb-scheme='light'] .explorerRowSelected {
+  background: #000000;
+  color: #ffffff;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .explorerRowSelected:hover { background: #000000; }
+:root[data-wb-scheme='light'] .explorerRowSelected .explorerName { color: #ffffff; }
+:root[data-wb-scheme='light'] .explorerRowSelected .explorerSize { color: #cccccc; }
+:root[data-wb-scheme='light'] .explorerRowSelected .explorerGlyph { color: #ffffff; }
+:root[data-wb-scheme='light'] .explorerRowSelected .explorerIcon { color: #ffffff; }
+:root[data-wb-scheme='light'] .explorerRowSelected .explorerGuide { background: #ffffff; }
+:root[data-wb-scheme='light'] .explorerRowSelected .explorerGuide[data-depth^='1'] { background: #666666; }
+:root[data-wb-scheme='light'] .explorerRowSelected:hover .explorerGlyph {
+  color: #ffffff;
+  box-shadow: none;
+}
+
+/* The dark palette paints a 1px vertical guide at each level of depth, so
+   the indent between a parent and a nested child reads as a structural rule
+   rather than as padding. Swiss keeps the same one-line-per-depth mechanism
+   but retones it to the Swiss grey (`#cccccc`) so it stays a structural
+   guide rather than disappearing into the white background. */
+:root[data-wb-scheme='light'] .explorerGuide {
+  background-image: linear-gradient(90deg, #cccccc 0 1px, transparent 1px);
+}
+:root[data-wb-scheme='light'] .explorerGlyph { color: #000000; }
+:root[data-wb-scheme='light'] .explorerIcon { color: #000000; }
+:root[data-wb-scheme='light'] .explorerRow[data-explorer-kind='file'] .explorerIcon {
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .explorerName {
+  font-weight: 500;
+  color: inherit;
+}
+:root[data-wb-scheme='light'] .explorerSize {
+  font-size: 11px;
+  color: #666666;
+}
+
+:root[data-wb-scheme='light'] .explorerNoteText { color: #666666; }
+:root[data-wb-scheme='light'] .explorerErrorText { color: #ff0000; }
+:root[data-wb-scheme='light'] .explorerRetry {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  box-shadow: none;
+  font-weight: 700;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .explorerRetry:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .explorerRetry::after {
+  content: '→';
+  margin-left: 4px;
+  font-weight: 400;
+}
+:root[data-wb-scheme='light'] .explorerSpin { animation: none; }
+:root[data-wb-scheme='light'] .explorerNote {
+  font-size: 11px;
+  color: #666666;
+  text-align: left;
+}
+:root[data-wb-scheme='light'] .explorerFoot {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #666666;
+  border-top: 1px solid #cccccc;
+  padding: 6px 10px;
+}
+
+/* ── Add card / empty state ─────────────────────────────────────────────── */
+
 :root[data-wb-scheme='light'] .addCard {
-  border-color: color-mix(in srgb, var(--wb-text) 18%, transparent);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--wb-text) 3%, transparent) 0%,
-      transparent 70%),
-    color-mix(in srgb, var(--wb-panel) 52%, transparent);
-  box-shadow: var(--wb-card-shadow);
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  padding: 18px;
+  color: #000000;
+  align-items: flex-start;
+  text-align: left;
+  box-shadow: none;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
 }
-
 :root[data-wb-scheme='light'] .addCard:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--wb-accent) 52%, transparent);
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--wb-accent) 5%, transparent) 0%,
-      transparent 70%),
-    var(--wb-panel);
-  box-shadow:
-    0 2px 4px color-mix(in srgb, var(--wb-text) 8%, transparent),
-    0 22px 44px -14px color-mix(in srgb, var(--wb-text) 20%, transparent),
-    0 0 24px color-mix(in srgb, var(--wb-accent) 12%, transparent);
+  background: #f0f0f0;
+  border-color: #ff0000;
+  color: #000000;
+  transform: none;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .addCard:disabled {
+  background: #ffffff;
+  border-color: #cccccc;
+  color: #999999;
+  opacity: 1;
+}
+:root[data-wb-scheme='light'] .addGlyph {
+  background: #000000;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #ffffff;
+  box-shadow: none;
+  align-self: flex-start;
+  width: 36px;
+  height: 36px;
+}
+:root[data-wb-scheme='light'] .addCard:hover:not(:disabled) .addGlyph {
+  background: #000000;
+  color: #ffffff;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .addTitle {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .addHint {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #666666;
+}
+:root[data-wb-scheme='light'] .addCard::after {
+  content: '→';
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 :root[data-wb-scheme='light'] .empty {
-  border-color: color-mix(in srgb, var(--wb-text) 16%, transparent);
-  background: color-mix(in srgb, var(--wb-panel) 58%, transparent);
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  padding: 56px 24px;
+  text-align: left;
+  align-items: flex-start;
+  box-shadow: none;
+  gap: 10px;
+}
+:root[data-wb-scheme='light'] .emptyGlyph {
+  background: #000000;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #ffffff;
+  box-shadow: none;
+  align-self: flex-start;
+  width: 44px;
+  height: 44px;
+}
+:root[data-wb-scheme='light'] .emptyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: #000000;
+  margin: 0;
+}
+:root[data-wb-scheme='light'] .emptyHint {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #666666;
+  margin: 0;
+}
+
+/* ── Foot ────────────────────────────────────────────────────────────────── */
+
+:root[data-wb-scheme='light'] .panelFoot {
+  background: #ffffff;
+  border-top: 1px solid #000000;
+}
+:root[data-wb-scheme='light'] .footHint {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #666666;
+}
+
+/* ── Notices ────────────────────────────────────────────────────────────── */
+
+:root[data-wb-scheme='light'] .notice {
+  background: #ffffff;
+  border-bottom: 1px solid #000000;
+  color: #000000;
+  padding: 12px 22px;
+  font-weight: 500;
+}
+:root[data-wb-scheme='light'] .noticeError {
+  background: #ffffff;
+  border-bottom: 2px solid #ff0000;
+  color: #ff0000;
+  padding: 12px 22px;
+  font-weight: 600;
+}
+:root[data-wb-scheme='light'] .noticeErrorText { color: #ff0000; }
+:root[data-wb-scheme='light'] .noticeClose {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .noticeClose:hover {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  color: #000000;
+}
+
+/* ── Picker (portaled modal: surfaces and chrome) ───────────────────────── */
+
+:root[data-wb-scheme='light'] .picker { color: #000000; }
+:root[data-wb-scheme='light'] .pickerContent { background: #ffffff; }
+
+:root[data-wb-scheme='light'] .pickerCrumbs { padding: 0 0 10px; }
+:root[data-wb-scheme='light'] .pickerCrumbSep { color: #999999; }
+:root[data-wb-scheme='light'] .pickerCrumb {
+  background: transparent;
+  border-radius: 0;
+  color: #666666;
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .pickerCrumb:hover {
+  background: #f0f0f0;
+  color: #000000;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .pickerCrumbCurrent {
+  background: #f0f0f0;
+  color: #000000;
+}
+
+:root[data-wb-scheme='light'] .pickerAddress {
+  border: 1px solid #000000;
+  border-radius: 0;
+  background: #ffffff;
+}
+:root[data-wb-scheme='light'] .pickerAddressInput {
+  border-radius: 0;
+  font-family: inherit;
+  color: #000000;
+  background: #ffffff;
+}
+
+:root[data-wb-scheme='light'] .pickerBar {
+  border: 1px solid #000000;
+  border-radius: 0;
+  background: #ffffff;
+}
+:root[data-wb-scheme='light'] .pickerPath { color: #000000; }
+:root[data-wb-scheme='light'] .pickerToggle {
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  border-radius: 0;
+}
+:root[data-wb-scheme='light'] .pickerTool {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  font-weight: 700;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .pickerTool:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #ff0000;
+  color: #000000;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .pickerTool:disabled {
+  background: #ffffff;
+  border-color: #cccccc;
+  color: #999999;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .pickerTool::after {
+  content: '→';
+  margin-left: 4px;
+  font-weight: 400;
+}
+:root[data-wb-scheme='light'] .pickerCreate {
+  background: #000000;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #ffffff;
+  font-weight: 700;
+}
+:root[data-wb-scheme='light'] .pickerNotice {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .pickerRows {
+  border: 1px solid #000000;
+  border-radius: 0;
+  background: #ffffff;
+  scrollbar-color: #000000 transparent;
+}
+:root[data-wb-scheme='light'] .pickerRows::-webkit-scrollbar { width: 8px; }
+:root[data-wb-scheme='light'] .pickerRows::-webkit-scrollbar-thumb {
+  background: #000000;
+  border: none;
+  border-radius: 0;
+  background-clip: border-box;
+}
+:root[data-wb-scheme='light'] .pickerRow {
+  background: transparent;
+  border-radius: 0;
+  color: #000000;
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .pickerRow:hover {
+  background: #f0f0f0;
+  color: #000000;
+  box-shadow: none;
+}
+:root[data-wb-scheme='light'] .pickerNote {
+  background: #ffffff;
+  color: #666666;
+  border-radius: 0;
+  text-align: left;
+}
+
+/* ── Editor (right column) ──────────────────────────────────────────────── */
+
+:root[data-wb-scheme='light'] .editor { color: #000000; }
+:root[data-wb-scheme='light'] .editorHead {
+  background: #ffffff;
+  border-bottom: 1px solid #000000;
+}
+:root[data-wb-scheme='light'] .editorName {
+  font-weight: 700;
+  color: #000000;
+}
+:root[data-wb-scheme='light'] .editorDirty { color: #ff0000; }
+:root[data-wb-scheme='light'] .editorTools {
+  gap: 6px;
+}
+:root[data-wb-scheme='light'] .editorTool,
+:root[data-wb-scheme='light'] .editorSave,
+:root[data-wb-scheme='light'] .editorCancel,
+:root[data-wb-scheme='light'] .editorPreview {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  font-weight: 700;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+:root[data-wb-scheme='light'] .editorMeta { color: #666666; }
+:root[data-wb-scheme='light'] .editorNotice {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+  text-align: left;
+}
+:root[data-wb-scheme='light'] .editorNote { color: #666666; text-align: left; }
+:root[data-wb-scheme='light'] .editorFailed {
+  background: #ffffff;
+  border: 1px solid #ff0000;
+  border-radius: 0;
+  color: #ff0000;
+  text-align: left;
+}
+:root[data-wb-scheme='light'] .editorBody {
+  background: #ffffff;
+  border-radius: 0;
+}
+:root[data-wb-scheme='light'] .editorGutter {
+  background: #ffffff;
+  color: #999999;
+  border-right: 1px solid #cccccc;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-wb-scheme='light'] .editorText,
+:root[data-wb-scheme='light'] .editorInput {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  background: #ffffff;
+  color: #000000;
+  border-radius: 0;
+}
+:root[data-wb-scheme='light'] .editorFoot {
+  background: #ffffff;
+  border-top: 1px solid #000000;
+}
+:root[data-wb-scheme='light'] .editorHint {
+  color: #666666;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+:root[data-wb-scheme='light'] .editorChip {
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  color: #000000;
+}
+
+/* ── Universal resets the dark rulesets still want in light ─────────────── */
+
+/* The dark palette leaves many gradients, rounded corners and shadows
+   trailing through the file (in the picker, the editor, the
+   prefers-reduced-motion block, and so on). This grouped block zeros the
+   ones the per-module rules above didn't already cover, so a third-party
+   light theme can't slip decoration back in through anything that
+   inherited from the dark defaults. */
+:root[data-wb-scheme='light'] * {
+  border-radius: 0;
+}
+:root[data-wb-scheme='light'] :is(.card, .addCard, .empty, .reading, .explorer, .panelHead, .panelFoot, .picker, .pickerContent, .pickerRow, .pickerTool, .pickerCreate, .pickerCrumb, .pickerAddress, .pickerAddressInput, .pickerBar, .pickerToggle, .pickerNotice, .pickerRows, .pickerNote, .editorHead, .editorName, .editorBody, .editorFoot, .editorGutter, .editorText, .editorInput, .editorChip, .editorNotice, .editorFailed, .notice, .noticeError, .noticeClose, .explorerHead, .explorerRow, .explorerTool, .explorerRetry, .action, .iconOnly, .cardOpen, .addGlyph, .emptyGlyph, .headGlyph, .live, .liveDot) {
+  border-radius: 0;
+}
+/* The two gradient leaks that survive are restated as flat 1px hairlines. */
+:root[data-wb-scheme='light'] .explorerRow:focus-visible {
+  outline: 2px solid #ff0000;
+  outline-offset: -2px;
+  box-shadow: none;
+}
+/* Belt-and-braces: under reduced motion every transition and animation stops.
+   The arrow translation is the only permitted motion; disabling it for
+   reduced-motion readers is part of the spec. */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-wb-scheme='light'] :is(.workbench, .panelHead, .headGlyph, .live,
+    .action, .iconOnly, .readings, .reading, .projects, .card, .cardOpen,
+    .addCard, .empty, .explorer, .explorerHead, .explorerRow, .explorerTool,
+    .explorerRetry, .panelFoot, .pickerCrumb, .pickerTool, .pickerRow,
+    .pickerCreate, .pickerAddress, .editorHead, .editorFoot) {
+    transition: none;
+  }
+  :root[data-wb-scheme='light'] :is(.liveDot, .explorerSpin,
+    .card::after, .addGlyph, .cardGlyph, .action::after, .cardOpen::after,
+    .card[data-card-status='running']::after,
+    .card[data-card-status='completed'][data-card-acknowledged='false']) {
+    animation: none;
+  }
 }
 
 /* ---- narrow windows and motion preferences ---- */

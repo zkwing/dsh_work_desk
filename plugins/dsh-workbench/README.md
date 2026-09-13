@@ -72,46 +72,93 @@ azure / violet 之所以 `oklch(from …)` 而不是直接消费 brand-primary�
 两两相邻在两种配色下都可辨，也与 slate 的中性灰明显区分。
 
 **背景网格**由 `::before` 一层四条渐变画成：**16px 细格 + 80px 粗格**（比早先的 32px 密），
-网格颜色**由 alias token 派生**而不是写死的字面色：深色配色下取 `--dsw-alias-label-primary`
-的低 alpha 混合（暗色下该 token 近白，混出来是冷色低对比网格），浅色配色下取
-`--dsw-alias-state-warn-primary`（即 amber，浅色下是金色"工程图"底纹），
-所以一个第三方主题只要重调这两个 alias，整面网格就跟着换色，不用本插件再写一条规则。
+深色配色下网格颜色**由 alias token 派生**（`--dsw-alias-label-primary` 的低 alpha 混合），
+浅色配色下退到 Swiss International 字面色：`#e8e8e8`（细格）和 `#cccccc`（粗格）。
+深色网格会跟着第三方主题走；浅色网格与主题脱钩，永远是瑞士灰。
 
-**浅色配色下每个模块单独"浮"起来**：宿主浅色的 `bg-base` / `bg-layer-1` / `bg-overlay`
-本身都是近白，模块若直接取这几个 alias 就会糊成一片。所以浅色分支额外声明了一组
-**模块材质 token**（画布 `--wb-bg` 染成带墨的纸、顶部 `--wb-ambient-halo` 改白光、
-`--wb-glass-edge` 换成更利落的发丝边、`--wb-rim-top` 取略浅的顶边、
-`--wb-card-base` / `--wb-card-rim` / `--wb-card-shadow` 三件套），再由一段
-`:root[data-wb-scheme='light']` 作用域规则给各模块各自的材质：
+**六张卡片强调色**（azure / violet / amber / emerald / rose / slate）
+只在深色配色下出现：浅色下卡片是无色的白底黑边（Swiss 模块），强调色只在
+**running**（红 `#ff0000`）、**completed**（蓝 `#0057b8`）和 hover（左侧导轨变红）
+这些"状态色"上用，模块本身不再上色。深色配色下仍然走 `oklch(from ...)` 派生。
 
-| 模块 | 浅色下的材质 |
+### 浅色配色：Swiss International Style
+
+浅色分支严格遵循 **Swiss International Style**（瑞士国际风格）设计系统：
+严格的网格、Helvetica 风格无衬线字体、大量负空间、纯黑白配色加红色（`#ff0000`）
+为唯一强调色、蓝色（`#0057b8`）为可选次级强调色；禁止装饰元素、阴影、圆角、
+渐变、单侧粗边框装饰，以及 ≥300ms 的过渡动画。
+
+浅色分支额外声明了一组 **Swiss 字面色 token**：
+
+| token | 浅色值 | 用途 |
+| --- | --- | --- |
+| `--wb-bg` | `#ffffff` | 画布纯白 |
+| `--wb-panel` / `--wb-card-base` | `#ffffff` | 模块纸面 |
+| `--wb-line` / `--wb-glass-edge` | `#000000` | 模块外框 |
+| `--wb-glass-tint` / `--wb-rim-top` | `#000000` | 内边 / 字形色 |
+| `--wb-text` | `#000000` | 正文 |
+| `--wb-text-dim` | `#666666` | 副文 |
+| `--wb-text-faint` | `#999999` | 极弱提示 |
+| `--wb-accent` / `--wb-danger` | `#ff0000` | 强调色 / 错误（导轨、focus、错误、运行中） |
+| `--wb-warn` | `#000000` | 警告（Swiss 没有专用色，用黑） |
+| `--wb-ok` | `#0057b8` | 完成（次级蓝色） |
+| `--wb-focus-ring` | `#ff0000` | focus 环 |
+| `--wb-shadow` / `--wb-scrim` / `--wb-scrim-strong` | `transparent` | 阴影/垫底层清零 |
+| `--wb-radius-card` / `-lg` / `-md` / `-sm` / `-pill` | `0` | 所有圆角归零（直角的瑞士网格） |
+| `--wb-grid-minor` / `-major` | `#e8e8e8` / `#cccccc` | 浅色网格退到瑞士灰 |
+
+外加每条交互的 150ms / `ease-out`（**禁止 duration-300 及以上**），以及
+**Rational Restraint**（hover 时只允许改 `background-color` 和 `border-color`，
+**禁止 transform / scale / shadow / translate**——唯一一个允许移动的元素是
+**按钮上的 `→` 箭头**，最多 `translateX(2px)`）。
+
+#### 浅色模块的瑞士网格
+
+| 模块 | 浅色下的样子 |
 | --- | --- |
-| 顶栏 `.panelHead` | 白底 + 底部发丝线 + 一层薄投影，卡片网格从它**后面**滚过 |
-| 顶栏徽标 `.headGlyph` | 实心墨色"拱心石"+ 纸色字形（浅色 brand 本身近黑，实心比低 alpha 洗色更像有意为之） |
-| 读数条 `.readings` / `.reading` | 墨色浅托盘，四条读数各站一张**白色仪表砖**（发丝边 + 两层接触阴影 + 顶沿 2px 强调色导轨） |
-| 卡片 `.card` | 近白**纸面**（`--wb-card-base` 94% 白）+ 顶部一层强调色淡染；深色那套四层玻璃在浅色下收敛成两层 |
-| 资源管理器 `.explorer` | 在卡片里**凹进去的井**：自己的边 + 内阴影 |
-| 底栏 `.panelFoot` | 比读数托盘更淡的横条，形成 顶栏 → 托盘 → 卡片区 → 底座 的层次 |
-| 空位 / 空态 `.addCard` / `.empty` | 半透明白 + 实发丝边 + 与卡片同款接触阴影，空网格也读成"布局"而不是"洞" |
+| 画布 `.workbench` | 纯白底 + 灰色网格（`#e8e8e8` / `#cccccc`，80px 粗格） |
+| 顶栏 `.panelHead` | 白底 + 1px 黑底边，z-index:2 让卡片网格从下面滚过 |
+| 顶栏徽标 `.headGlyph` | **实心黑方块 + 白字形**（36×36），没圆角、没阴影 |
+| 标题 `.title` | 22px / 700 / `letter-spacing: -0.01em` |
+| 副标题 `.subtitle` | 10.5px / **大写 / 宽字距**，灰 `#666666` |
+| 运行中 `.live` | 黑边白底方块，**静态**小黑方块标记（无脉动） |
+| 读数 `.reading` | 1px 黑边白底方块，标签 10px 大写宽字距黑、数值 24px 粗、提示大写灰 |
+| 卡片 `.card` | 白底 + **1px 黑边 + 左导轨 #cccccc**（hover 时左导轨变红 `#ff0000`，背景 `#f0f0f0`）；3px 强调色侧栏已删除 |
+| 卡片标题 `.cardOpen` | 文字按钮；hover 标题变红、后方 `→` 箭头（`translateX(2px)`） |
+| 路径 `.cardPath` | 灰色，等宽字族改回 sans；hover 时**变红**（Hierarchy Focus：分类标签在 hover 时被高亮） |
+| 卡片状态文字 `.cardStatus` | **新增**：右上角小字大写宽字距 `空闲 / 运行中 / 已完成`，**防止状态只用颜色传递** |
+| 文件树 `.explorer` | 1px 黑边白底方块；选中行反转为**黑底白字**；hover 仅改背景色 |
+| 文件树行 hover | 背景 `#f0f0f0`，左侧多级 `1px` `#cccccc` 缩进导轨保留 |
+| 文件树缩略图标 | 工具栏按钮 hover bg `#f0f0f0`、border 黑 |
+| 添加卡 `.addCard` / 空状态 `.empty` | 1px 黑边白底方块，**虚线边已改成实线**（Swiss 禁止 dashed）；hover bg `#f0f0f0`、border 红；右侧 `→` 箭头 |
+| 底栏 `.panelFoot` | 白底 + 1px 黑顶边，标签大写灰 |
+| 通告 `.notice` | 白底黑字 + 黑底边；`.noticeError` 白底红字 + 红底边（**2px** 红条） |
+| 按钮 `.action` | 白底黑边方块，hover bg `#f0f0f0` + border 红，**附带 `→` 箭头**（hover 时右移） |
+| 弹窗 `.picker` | 白底黑边方块；面包屑 hover `#f0f0f0`；行 hover `#f0f0f0`；工具按钮 hover 同 `.action` |
+| 编辑器 `.editor` | 白底黑边；左侧行号 gutter 灰、1px 右分界；正文 textarea 等宽→sans，**保留 tabular-nums** |
 
-**深色分支一个字节都没动**：所有会跟卡片状态打架的属性（`border-color` / `box-shadow`）
-走的是上面那组 token，浅色只换 token 的值，所以卡片的 hover / focus / running / completed
-四种状态在两种配色下都仍然成立，不需要在浅色分支里重抄一遍。
+#### 浅色下的三个卡片状态（颜色 + 文字双通道）
 
-卡片是**液晶玻璃**：半透明层 + `backdrop-filter: blur(22px) saturate(180%)`，
-亮边（`border-top-color` 提亮）、内侧高光与下沉阴影，加一道斜向镜面高光，
-hover 时高光缓慢扫过并轻微上浮（浅色分支把模糊收敛到 `blur(18px) saturate(150%)`，
-因为浅色卡片背后本来就没有多少颜色可糊）。深色下玻璃的色调从 `--wb-glass-tint`
-（= 当前文字色）混合而来，一套配方成立；浅色下则由 `--wb-card-base` 换成近白纸面。
-全部新增的 hover / focus / sheen 动画都在 `@media (prefers-reduced-motion: reduce)` 内被设为
-`transition: none` + `--wb-sheen-angle: 0deg`，动画一律关掉。
+| 状态 | 边框颜色 | `.cardStatus` 标签 | 提示 |
+| --- | --- | --- | --- |
+| `idle` | `#cccccc`（左导轨默认） | `空闲` | 默认 |
+| `running` | `#ff0000` | `运行中`（红字） | 无旋转环（`animation: none`） |
+| `completed` | `#0057b8` | `已完成`（蓝字） | 无脉动光晕 |
+
+文字标签保证了「状态不是只靠颜色传递」，符合 Swiss 自检清单与 WCAG。
+
+**深色分支一个字节都没动**：浅色只覆盖在 `:root[data-wb-scheme='light']` 作用域内，
+所有深色专属的玻璃、圆角、动画都由深色 `:root` 与共享规则承担，浅色规则只是
+**在 light 作用域内把它们一一去掉**（`border-radius: 0`、`box-shadow: none`、
+`background: ...` 换成纯色、`animation: none`）。`accentFor` / `oklch(...)` 卡片强调色
+在浅色下不再上墙（`display: none`），模块本身变成无色——靠文字标签和 hover 导轨区分。
 
 外观/主题变更的**自动传播路径**：`ctx.theme` 的 `active.colorScheme` 通过注册的 `hooks.scheme`
 绑定成 `useScheme` 选择器 hook，面板根上落 `data-wb-scheme="light|dark"`，样式表据此切换；
 `theme/change` 事件由 `ctx.on('theme/change', …)` 订阅，每一次主题翻转都会即时更新
-`data-wb-scheme` — 也就是说 DSH Desktop 上点切换主题、注册第三方主题、或调整任何 alias token，
-工作台界面的所有 token 派生色（含背景网格和六张卡片强调色）都会在同一帧内跟随变化，
-不需要本插件做任何额外注册。
+`data-wb-scheme` — 也就是说 DSH Desktop 上点切换主题或注册第三方主题，
+深色网格与深色卡片强调色在同一帧内跟随变（因为它们仍然走 `--dsw-alias-*` 派生），
+而**浅色瑞士配色走字面色板**，与宿主主题脱钩、始终保持 Swiss International 的字面规矩。
 
 ## 四条硬约束
 
