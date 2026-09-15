@@ -98,7 +98,12 @@ $tsconfig = @'
     "paths": {
       "react": ["./../../client/ui-sidebar/node_modules/@types/react/index.d.ts"],
       "react/jsx-runtime": ["./../../client/ui-sidebar/node_modules/@types/react/jsx-runtime.d.ts"],
-      "@deepseek-ai/cordis": ["./../../../vendor/cordis/lib/types/index.d.ts"]
+      "@deepseek-ai/cordis": ["./../../../vendor/cordis/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-slots": ["./../../client/ui-slots/lib/types/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-renderer/client": ["./../../client/ui-renderer/lib/types/client/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-sidebar/client": ["./../../client/ui-sidebar/lib/types/client/index.d.ts"],
+      "@deepseek-ai/dsh-client-locale/client": ["./../../client/locale/lib/types/client/index.d.ts"],
+      "@deepseek-ai/dsh-client-ui-sidebar-right/client": ["./../../client/ui-sidebar-right/lib/types/client/index.d.ts"]
     }
   },
   "references": [],

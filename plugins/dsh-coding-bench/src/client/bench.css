@@ -1,0 +1,75 @@
+/*
+ * Coding Bench — minimal layout for the M2 placeholders.
+ *
+ * Every class is `cb-` prefixed so it is unmistakable as this plugin's surface
+ * and cannot collide with a host class by accident. M9 will replace this file
+ * with the real visual pass (theme, split gutter, tab strip, gutter, focus
+ * rings, prefers-reduced-motion); what is here is just enough to make the
+ * placeholders legible for a smoke test.
+ */
+
+/* Main column body. */
+.cb-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  color: var(--ds-text, #111);
+}
+.cb-main__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.cb-main__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ds-text-dim, #555);
+}
+.cb-main__placeholder {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--ds-border, #ccc);
+  border-radius: 6px;
+  background: var(--ds-bg-layer-1, #f6f6f7);
+  font-size: 13px;
+  color: var(--ds-text-dim, #555);
+}
+
+/* Sidebar panel-list glyph. */
+.cb-icon {
+  display: inline-block;
+  font-family: var(--ds-font-family-code, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: inherit;
+}
+
+/* Right column page (explorer + editor split, both still placeholders). */
+.cb-page {
+  display: grid;
+  grid-template-columns: minmax(220px, 30%) 1fr;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  color: var(--ds-text, #111);
+}
+.cb-page__explorer,
+.cb-page__editor {
+  padding: 16px;
+  border: 1px dashed var(--ds-border, #ccc);
+  background: var(--ds-bg-layer-1, #f6f6f7);
+  margin: 12px 0 12px 12px;
+}
+.cb-page__editor {
+  margin: 12px 12px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cb-page__foot {
+  grid-column: 1 / -1;
+  padding: 6px 12px;
+  border-top: 1px solid var(--ds-border, #ccc);
+  font-size: 11px;
+  color: var(--ds-text-dim, #555);
+}
