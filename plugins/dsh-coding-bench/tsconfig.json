@@ -1,0 +1,16 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "paths": {
+      "react": ["./../../client/ui-sidebar/node_modules/@types/react/index.d.ts"],
+      "react/jsx-runtime": ["./../../client/ui-sidebar/node_modules/@types/react/jsx-runtime.d.ts"],
+      "@deepseek-ai/cordis": ["./../../../vendor/cordis/lib/types/index.d.ts"]
+    }
+  },
+  "references": [],
+  "include": ["src"]
+}

@@ -1,0 +1,37 @@
+{
+  "name": "dsh-coding-bench",
+  "version": "0.0.1",
+  "description": "Empty skeleton. Drop a real `apply()` into src/client/index.ts and the Host-side wiring in src/index.ts; rebuild with build-plugin.ps1.",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "dsh": ">=0.1.5-rc.1"
+  },
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/index.d.ts",
+    "lib/client.js",
+    "lib/client.js.map",
+    "lib/types/index.d.ts",
+    "lib/types/**/*.d.ts",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [],
+      "external": []
+    }
+  }
+}

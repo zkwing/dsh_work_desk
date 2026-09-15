@@ -1,0 +1,5 @@
+# Text is normalized to LF in the repository. The build script runs under
+# Windows PowerShell 5.1, which is happiest with CRLF.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.tgz binary

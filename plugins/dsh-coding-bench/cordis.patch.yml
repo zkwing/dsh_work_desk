@@ -1,0 +1,16 @@
+# dsh-coding-bench: the profile-layer patch this bundle contributes.
+#
+# A bundle's patch is applied after the layers listed before it in the active
+# profile's `dsh.profile.bundles`, and before the profile's own
+# `cordis.patch.yml`. This one only registers the plugin's Host row: the row
+# makes the package a live Loader entry, which is what lets the client module
+# system discover its `dsh.client` declaration and serve
+# `/plugins/dsh-coding-bench/client.js` to the browser.
+#
+# Replace `id: coding-bench` with the cordis id your plugin claims (usually
+# the part after the `dsh-` prefix; the slot keys your client `apply` uses
+# must match this id). Leave `name` set to the package name from
+# package.json.
+- insert:
+    - id: coding-bench
+      name: dsh-coding-bench

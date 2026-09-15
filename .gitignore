@@ -1,0 +1,21 @@
+# Editor / OS noise
+Thumbs.db
+desktop.ini
+.DS_Store
+*.swp
+
+# DSH Desktop (Electron/crashpad) writes this into whatever cwd it was launched
+# from — it is not part of the project.
+debug.log
+**/debug.log
+
+# Packed distributables are reproducible with `pnpm pack` inside the plugin
+# directory; the built lib/ tree is committed instead, so another machine can
+# install straight from this repository without building anything.
+*.tgz
+
+# Installed trees
+node_modules/
+
+# Build / typecheck scratch (stray tsconfig from a local --noEmit pass)
+.tsc/
